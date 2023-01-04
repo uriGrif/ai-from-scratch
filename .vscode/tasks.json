@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "C/C++: cpp.exe build active file",
+			"command": "E:\\w64devkit-1.12.0\\bin\\g++.exe",
+			"args": [
+				"-fdiagnostics-color=always",
+				"-I",
+				"${fileDirname}",
+				"-g",
+				"${fileDirname}/*.cpp",
+				"-o",
+				"${fileDirname}/${fileBasenameNoExtension}.exe"
+			],
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": ["$gcc"],
+			"group": "build",
+			"detail": "compiler: E:\\w64devkit-1.12.0\\bin\\g++.exe"
+		}
+	]
+}

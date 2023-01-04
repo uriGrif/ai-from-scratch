@@ -1,0 +1,58 @@
+---------- IMPRIMIR MATRICES SIMPLES --------------
+
+std::cout << "Train Y:" << std::endl;
+for (int i = 0; i < train_height; i++)
+{
+    std::cout << train_y[i] << std::endl;
+}
+
+std::cout << "Train X:" << std::endl;
+for (int i = 0; i < train_height; i++)
+{
+    for (int j = 0; j < df.getWidth() - 1; j++)
+    {
+        std::cout << train_x[i][j] << " ";
+    }
+    std::cout << std::endl;
+}
+
+std::cout << std::endl;
+
+std::cout << "Test Y:" << std::endl;
+for (int i = 0; i < test_height; i++)
+{
+    std::cout << test_y[i] << std::endl;
+}
+
+std::cout << "Test X:" << std::endl;
+for (int i = 0; i < test_height; i++)
+{
+    for (int j = 0; j < df.getWidth() - 1; j++)
+    {
+        std::cout << test_x[i][j] << " ";
+    }
+    std::cout << std::endl;
+}
+
+
+---- USAR DATAFRAME ---------------------
+
+df.addColumn("Name");
+df.addColumn("Lastname");
+df.addColumn("Age");
+
+df.addRow({"Uri", "Grifman", 19});
+df.addRow({"Dali", "Bocian", 20});
+
+df.print();
+
+std::vector<std::variant<double, std::string>> col = df.getCol("y");
+
+double sum = 0;
+
+for (int i = 0; i < col.size(); i++)
+{
+    sum += std::get<double>(col[i]);
+}
+
+std::cout << "Sum: " << sum << std::endl;
