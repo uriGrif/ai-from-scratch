@@ -170,5 +170,5 @@ void LinearRegression::test() {
         error_accum += error;
     }
     double avg_error = error_accum / train_height;
-    std::cout << "The model\'s is " << 100 - avg_error << "% accurate!" << std::endl;
+    std::cout << "The model is " << 100 - avg_error << "% accurate!" << std::endl;
 }

@@ -40,6 +40,7 @@ void DataFrame::load_csv(const char *filename, const char &delimiter)
                 }
                 catch (const std::exception &e)
                 {
+                    // std::cout << line << " ";
                     std::cout << "couldn't convert to double" << std::endl;
                     row.push_back(line);
                 }
