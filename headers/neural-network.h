@@ -5,6 +5,7 @@ class Layer {
         double *inputs;
         double **weights;
         double *outputs;
+        double *deactivated_outputs;
 
         int inputs_amount;
         int neurons_amount;
@@ -19,9 +20,15 @@ class Layer {
     public:
         Layer();
         Layer(int _inputs_amount, int _neurons_amount, int _activation_type);
+        int getInputsAmount();
+        int getNeuronsAmount();
         void setInputs(double *_inputs);
         void calculateOutputs();
         double *getOutputs();
+        double getActivationDerivatives(double *&neurons_activation_derivatives);
+        void setNeuronError(int index, double error);
+        double getNeuronError(int index);
+        double getWeightsByNeuron(int index);
 };
 
 class NeuralNetwork {
@@ -48,8 +55,9 @@ class NeuralNetwork {
         void setDatasets(double **_train_x, double *_train_y, double **_test_x, double *_test_y, int _train_height, int _test_height);
         void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
         void setInputs(double *_inputs);
+        void feedForward();
         void predict(double *_inputs);
-        void backPropagation();
+        void backPropagation(double *difference_sums);
         void train();
         void test();
 };
