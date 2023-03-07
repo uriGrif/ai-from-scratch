@@ -202,7 +202,11 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
                 layers[i].setNeuronError(j, 2 * difference_sums[j] / batch_size * neurons_activation_derivatives[j]); // set dc/da * da/dz
             } else {
                 // hidden layer
-                // layers[i].setNeuronError(j, layers[i+1].getNeuronError(j) * layers[i+1].getWeightsByNeuron(j) * neurons_activation_derivatives[j]);
+                // for each weight
+                for (int k = 0; k < layers[i].getInputsAmount()+1; k++) {
+                    // layers[i].setNeuronError(j, layers[i+1].getNeuronError(j) * layers[i+1].getWeightsByNeuron(j) * neurons_activation_derivatives[j]);
+                }
+
             }   
         }
 
