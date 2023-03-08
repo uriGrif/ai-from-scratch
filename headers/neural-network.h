@@ -4,7 +4,6 @@ class Layer {
     private:
         double *inputs;
         double **weights;
-        double *outputs;
         double *deactivated_outputs;
 
         int inputs_amount;
@@ -15,7 +14,7 @@ class Layer {
         double *neurons_errors;
         double **weights_gradients;
 
-        void activate();
+        double activate(double x);
 
     public:
         Layer();
@@ -23,12 +22,15 @@ class Layer {
         int getInputsAmount();
         int getNeuronsAmount();
         void setInputs(double *_inputs);
-        void calculateOutputs();
-        double *getOutputs();
-        double getActivationDerivatives(double *&neurons_activation_derivatives);
+        double *getInputs();
+        void calculateOutputs(double *results_vector);
+        void getActivationDerivatives(double *&neurons_activation_derivatives);
         void setNeuronError(int index, double error);
         double getNeuronError(int index);
-        double getWeightsByNeuron(int index);
+        double getWeight(int i, int j);
+        void deltaXWeights(double *&result);
+        void calculateWeightsGradients();
+        void updateWeights(double learning_rate);
 };
 
 class NeuralNetwork {
@@ -41,6 +43,8 @@ class NeuralNetwork {
         int test_height = 0;
         
         Layer *layers;
+        double *outputs;
+        
         int layers_amount;
         int inputs_amount;
         int outputs_amount;
@@ -55,8 +59,10 @@ class NeuralNetwork {
         void setDatasets(double **_train_x, double *_train_y, double **_test_x, double *_test_y, int _train_height, int _test_height);
         void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
         void setInputs(double *_inputs);
+        void fullyActivateLastLayer();
         void feedForward();
-        void predict(double *_inputs);
+        void predict(double *_inputs, bool print_results=false);
+        void deltaXWeights(int layer_index, double *&result);
         void backPropagation(double *difference_sums);
         void train();
         void test();
