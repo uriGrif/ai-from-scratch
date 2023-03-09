@@ -1,4 +1,5 @@
 #include <iostream>
+#include "./headers/dataframe.h"
 
 class Layer {
     private:
@@ -56,14 +57,17 @@ class NeuralNetwork {
     public:
         NeuralNetwork();
         NeuralNetwork(int _layers_amount, int _inputs_amount, int _outputs_amount);
-        void setDatasets(double **_train_x, double *_train_y, double **_test_x, double *_test_y, int _train_height, int _test_height);
+        void setTrainData(DataFrame &df);
+        void setTestData(DataFrame &df);
         void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
+        void setLayer(int index, int inputs_amount, int neurons_amount, int activation_type);
         void setInputs(double *_inputs);
         void fullyActivateLastLayer();
         void feedForward();
         void predict(double *_inputs, bool print_results=false);
-        void deltaXWeights(int layer_index, double *&result);
         void backPropagation(double *difference_sums);
         void train();
         void test();
+        double **getTest_x();
+        double *getTest_y();
 };

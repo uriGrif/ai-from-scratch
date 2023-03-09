@@ -2,21 +2,22 @@
 
 DataFrame::DataFrame() {}
 
-DataFrame::DataFrame(const char *filename, const char &delimiter)
+DataFrame::DataFrame(const char *filename, const char &delimiter, bool hasHeader)
 {
-    load_csv(filename, delimiter);
+    load_csv(filename, delimiter, hasHeader);
 }
 
 DataFrame::~DataFrame() {}
 
-void DataFrame::load_csv(const char *filename, const char &delimiter)
+void DataFrame::load_csv(const char *filename, const char &delimiter, bool hasHeader)
 {
     std::cout << "Loading csv..." << std::endl;
 
     std::ifstream file;
     file.open(filename);
 
-    bool is_header = true;
+    bool is_header = hasHeader;
+    bool is_first_line = true;
     std::string line;
     std::vector<std::variant<double, std::string>> row;
     while (std::getline(file, line))
@@ -37,6 +38,7 @@ void DataFrame::load_csv(const char *filename, const char &delimiter)
                 try
                 {
                     row.push_back(std::stod(line));
+                    if (is_first_line) width++;
                 }
                 catch (const std::exception &e)
                 {
@@ -47,6 +49,7 @@ void DataFrame::load_csv(const char *filename, const char &delimiter)
             }
         }
 
+        if (is_first_line) is_first_line = false;
         if (!is_header) addRow(row);
         
         is_header = false;
@@ -177,6 +180,34 @@ void DataFrame::getSimpleMatrixes(double **&train_x,
         {
             test_y[i - train_height] = std::get<double>(rows[i][y_index]);
         }
+        std::vector<std::variant<double, std::string>>().swap(rows[i]); // free memory
+    }
+
+    std::vector<std::vector<std::variant<double, std::string>>>().swap(rows); // free memory
+}
+
+void DataFrame::getSimpleMatrix(double **&data_x, double *&data_y, int &_height, int y_index)
+{
+    _height = height;
+
+    data_x = new double *[height];
+    data_y = new double[height];
+
+    int aux;
+
+    for (int i = 0; i < height; i++)
+    {
+        aux = 0;
+        for (int j = 0; j < width; j++) {
+            if (!j) data_x[i] = new double[width - 1];
+            if (j != y_index) {
+                data_x[i][aux] = std::get<double>(rows[i][j]);
+                aux++;
+            }
+        }
+        
+        data_y[i] = std::get<double>(rows[i][y_index]);
+        
         std::vector<std::variant<double, std::string>>().swap(rows[i]); // free memory
     }
 

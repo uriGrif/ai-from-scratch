@@ -1,5 +1,8 @@
 #include "./headers/neural-network.h"
+#include "./headers/dataframe.h"
 #include <math.h>
+
+Layer::Layer() {}
 
 Layer::Layer(int _inputs_amount, int _neurons_amount, int _activation_type) {
     inputs_amount = _inputs_amount;
@@ -17,14 +20,14 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, int _activation_type) {
     neurons_errors = new double[neurons_amount];
     
     // initiate weights array (inputs x neurons)
-    weights = new double*[neurons_amount];
-    weights_gradients = new double*[neurons_amount];
+    weights = new double*[inputs_amount + 1];
+    weights_gradients = new double*[inputs_amount + 1];
     
     for (int i = 0; i < inputs_amount + 1; i++) {
         weights[i] = new double[neurons_amount];
         weights_gradients[i] = new double[neurons_amount];
         for (int j = 0; j < neurons_amount + 1; j++) {
-            weights[i][j] = 0.5;
+            weights[i][j] = 0.001; //small number to avoid getting infinite values and nan
             weights_gradients[i][j] = 0;
         }
     }
@@ -40,19 +43,21 @@ void Layer::setInputs(double *_inputs) {
 double Layer::activate(double x) {
     double e = 2.718;
     
+    double res;
     switch (activation_type)
     {
         case 0:
             // ReLU
-            return x < 0 ? 0 : x;
+            res = x < 0 ? 0 : x;
             break;
         case 1:
             // softmax
-            return pow(e, x); // This is partial activation, to get the actual activation you need to divide by the sum of all activations
+            res = pow(e, x); // This is partial activation, to get the actual activation you need to divide by the sum of all activations
             break;
         default:
             break;
     }
+    return res;
 }
 
 void Layer::calculateOutputs(double *results_vector) {
@@ -69,6 +74,8 @@ void Layer::calculateOutputs(double *results_vector) {
 void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
     // returns da/dz (activation derivatives)
     // it's a vector of size neurons_amount
+    double sum;
+    double e = 2.718;
     switch (activation_type)
     {
         case 0:
@@ -80,8 +87,6 @@ void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
             break;
         case 1:
             // softmax
-            double sum;
-            double e = 2.718;
             for (int i = 0; i < neurons_amount; i++)
             {
                 sum += pow(e, deactivated_outputs[i]);
@@ -91,7 +96,6 @@ void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
                 neurons_activation_derivatives[i] = pow(e, deactivated_outputs[i]) / sum;
             }
             break;
-        
         default:
             break;
     }
@@ -155,6 +159,8 @@ void Layer::updateWeights(double learning_rate) {
     }
 }
 
+NeuralNetwork::NeuralNetwork() {}
+
 NeuralNetwork::NeuralNetwork(int _layers_amount, int _inputs_amount, int _outputs_amount) {
     layers_amount = _layers_amount;
     inputs_amount = _inputs_amount;
@@ -164,13 +170,12 @@ NeuralNetwork::NeuralNetwork(int _layers_amount, int _inputs_amount, int _output
     outputs = new double[_outputs_amount];
 }
 
-void NeuralNetwork::setDatasets(double **_train_x, double *_train_y, double **_test_x, double *_test_y, int _train_height, int _test_height) {
-    train_x = _train_x;
-    train_y = _train_y;
-    test_x = _test_x;
-    test_y = _test_y;
-    train_height = _train_height;
-    test_height = _test_height;
+void NeuralNetwork::setTrainData(DataFrame &df) {
+    df.getSimpleMatrix(train_x, train_y, train_height);
+}
+
+void NeuralNetwork::setTestData(DataFrame &df) {
+    df.getSimpleMatrix(test_x, test_y, test_height);
 }
 
 void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs) {
@@ -179,6 +184,9 @@ void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _e
     epochs = _epochs;
 }
 
+void NeuralNetwork::setLayer(int index, int inputs_amount, int neurons_amount, int activation_type) {
+    layers[index] = Layer(inputs_amount, neurons_amount, activation_type);
+}
 
 void NeuralNetwork::setInputs(double *_inputs) {
     layers[0].setInputs(_inputs);
@@ -186,7 +194,7 @@ void NeuralNetwork::setInputs(double *_inputs) {
 
 void NeuralNetwork::feedForward() {
     for (int i = 0; i < layers_amount; i++) {
-        if (i < layers_amount - 1) {
+        if (i == layers_amount - 1) {
             layers[i].calculateOutputs(outputs);
         } else {
             layers[i].calculateOutputs(layers[i+1].getInputs());
@@ -208,7 +216,7 @@ void NeuralNetwork::fullyActivateLastLayer() {
     }
 }
 
-void NeuralNetwork::predict(double *_inputs, bool print_results=false) {
+void NeuralNetwork::predict(double *_inputs, bool print_results) {
     setInputs(_inputs);
     feedForward();
     fullyActivateLastLayer();
@@ -228,20 +236,23 @@ void NeuralNetwork::test() {
     double error;
     double error_accum = 0;
     int test_label;
+
+    std::cout << "Testing model..." << std::endl;
     
     for (int i = 0; i < test_height; i++)
     {
         predict(test_x[i]);
         for (int j = 0; j < outputs_amount; j++)
         {
-            prediction = outputs[j];
-            test_label = test_y[i] == j ? 1 : 0;
-            error = 100 - (prediction * 100 / test_label);
-            if (error < 0) error *= -1;
-            error_accum += error;
+            if (test_y[i] == j) {
+                prediction = outputs[j];
+                error = 100 - (prediction * 100);
+                if (error < 0) error *= -1;
+                error_accum += error;
+            }
         }
     }
-    double avg_error = error_accum / (train_height * outputs_amount);
+    double avg_error = error_accum / test_height;
     std::cout << "The model is " << 100 - avg_error << "% accurate!" << std::endl;
 }
 
@@ -315,4 +326,12 @@ void NeuralNetwork::train() {
     }
     std::cout << "Training finished!" << std::endl;
     test();
+}
+
+double** NeuralNetwork::getTest_x() {
+    return test_x;
+}
+
+double* NeuralNetwork::getTest_y() {
+    return test_y;
 }

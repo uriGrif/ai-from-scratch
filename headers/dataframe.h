@@ -20,10 +20,10 @@ class DataFrame {
 
     public:
         DataFrame();
-        DataFrame(const char *filename, const char &delimiter=',');
+        DataFrame(const char *filename, const char &delimiter=',', bool hasHeader=true);
         ~DataFrame();
         void print();
-        void load_csv(const char *filename, const char &delimiter=',');
+        void load_csv(const char *filename, const char &delimiter=',', bool hasHeader=true);
         int getWidth();
         int getHeight();
         std::vector<std::variant<double, std::string>> getRow(int index);
@@ -39,4 +39,5 @@ class DataFrame {
             int &test_height,
             float train_fraction=0.75f,
             int y_index=0);
+        void getSimpleMatrix(double **&data_x, double *&data_y, int &height, int y_index=0);
 };
