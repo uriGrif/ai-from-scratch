@@ -70,4 +70,5 @@ class NeuralNetwork {
         void test();
         double **getTest_x();
         double *getTest_y();
+        void printOutputs();
 };

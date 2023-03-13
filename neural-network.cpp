@@ -40,9 +40,7 @@ void Layer::setInputs(double *_inputs) {
     }
 }
 
-double Layer::activate(double x) {
-    double e = 2.718;
-    
+double Layer::activate(double x) {   
     double res;
     switch (activation_type)
     {
@@ -52,7 +50,10 @@ double Layer::activate(double x) {
             break;
         case 1:
             // softmax
-            res = pow(e, x); // This is partial activation, to get the actual activation you need to divide by the sum of all activations
+    
+            // about NaN values: https://www.jeremyong.com/cpp/machine-learning/2020/10/23/cpp-neural-network-in-a-weekend/
+            
+            res = exp(x); // This is partial activation, to get the actual activation you need to divide by the sum of all activations
             break;
         default:
             break;
@@ -61,6 +62,7 @@ double Layer::activate(double x) {
 }
 
 void Layer::calculateOutputs(double *results_vector) {
+    double max = 0;
     for (int i = 0; i < neurons_amount; i++) {
         double sum = 0;
         for (int j = 0; j <= inputs_amount; j++) {
@@ -75,7 +77,6 @@ void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
     // returns da/dz (activation derivatives)
     // it's a vector of size neurons_amount
     double sum;
-    double e = 2.718;
     switch (activation_type)
     {
         case 0:
@@ -89,11 +90,11 @@ void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
             // softmax
             for (int i = 0; i < neurons_amount; i++)
             {
-                sum += pow(e, deactivated_outputs[i]);
+                sum += exp(deactivated_outputs[i]);
             }
             for (int i = 0; i < neurons_amount; i++)
             {
-                neurons_activation_derivatives[i] = pow(e, deactivated_outputs[i]) / sum;
+                neurons_activation_derivatives[i] = exp(deactivated_outputs[i]) / sum;
             }
             break;
         default:
@@ -127,11 +128,12 @@ double Layer::getWeight(int i, int j) {
 
 void Layer::deltaXWeights(double *&result) {   
     // matrix multiplication -> delta * weights (transpose) of next layer
-    for (int i = 0; i < neurons_amount; i++)
+    for (int i = 0; i < inputs_amount; i++)
     {
-        for (int j = 0; j < inputs_amount; j++)
+        result[i] = 0;
+        for (int j = 0; j < neurons_amount; j++)
         {
-            result[i] += neurons_errors[i] * weights[i][j];
+            result[i] += neurons_errors[j] * weights[i][j];
         }
     }
 }
@@ -139,18 +141,21 @@ void Layer::deltaXWeights(double *&result) {
 void Layer::calculateWeightsGradients() {
     // calculate weight gradients
     // dC/dW = * (a^(L-1))^t * delta^L
-    for (int i = 0; i < inputs_amount; i++)
+    for (int i = 0; i <= inputs_amount; i++)
     {
         for (int j = 0; j < neurons_amount; j++)
         {
-            weights_gradients[i][j] = inputs[i] * neurons_errors[j];
+            if (i == inputs_amount)
+                weights_gradients[i][j] = 1 * neurons_errors[j];
+            else
+                weights_gradients[i][j] = inputs[i] * neurons_errors[j];
         }
     }
 }
 
 void Layer::updateWeights(double learning_rate) {
     // update weights
-    for (int i = 0; i < inputs_amount; i++)
+    for (int i = 0; i <= inputs_amount; i++)
     {
         for (int j = 0; j < neurons_amount; j++)
         {
@@ -216,13 +221,22 @@ void NeuralNetwork::fullyActivateLastLayer() {
     }
 }
 
+void NeuralNetwork::printOutputs() {
+    std::cout << "Output: [ ";
+        for (int i = 0; i < outputs_amount; i++)
+        {
+            std::cout << outputs[i] << " ; ";
+        }
+        std::cout << "]" << std::endl;
+}
+
 void NeuralNetwork::predict(double *_inputs, bool print_results) {
     setInputs(_inputs);
     feedForward();
     fullyActivateLastLayer();
     
     if (print_results) {
-        std::cout << "Predicted output: [";
+        std::cout << "Predicted output: [ ";
         for (int i = 0; i < outputs_amount; i++)
         {
             std::cout << outputs[i] << " ; ";
@@ -267,9 +281,12 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
         
         // calculate neuron error
         // delta^L
+        
+        neurons_activation_derivatives = new double[layers[i].getNeuronsAmount()];
+        layers[i].getActivationDerivatives(neurons_activation_derivatives); // da/dz
+
         for (int j = 0; j < layers[i].getNeuronsAmount(); j++)
         {    
-            layers[i].getActivationDerivatives(neurons_activation_derivatives); // da/dz
             
             if (i == layers_amount - 1) {
                 // output layer
@@ -279,7 +296,9 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
                 layers[i].setNeuronError(j, 2 * difference_sums[j] / batch_size * neurons_activation_derivatives[j]); 
             } else {
                 // hidden layer
+
                 auxDeltaXWeights = new double[layers[i].getNeuronsAmount()];
+                
                 layers[i+1].deltaXWeights(auxDeltaXWeights);
 
                 layers[i].setNeuronError(j, auxDeltaXWeights[j] * neurons_activation_derivatives[j]);
@@ -290,6 +309,8 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
 
         // calculate weight gradients
         layers[i].calculateWeightsGradients();
+
+        delete[] neurons_activation_derivatives;
     }
 
     // update weights
@@ -301,13 +322,15 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
 
 void NeuralNetwork::train() {
     std::cout << "Training..." << std::endl;
+    std::cout << "Training Samples: " << train_height << std::endl;
     double *difference_sums = new double[outputs_amount];
     double *aux_out;
     double aux_label;
     for (int e = 0; e < epochs; e++)
     {
-        std::cout << "Epoch " << e + 1 << std::endl;
-        for (int i = 0; i < epochs / batch_size; i++)
+        std::cout << std::endl << "Epoch " << e + 1 << std::endl;
+
+        for (int i = 0; i < (train_height / batch_size); i++)
         {
             for (int j = 0; j < batch_size; j++)
             {
@@ -320,12 +343,21 @@ void NeuralNetwork::train() {
                     difference_sums[k] += aux_label - outputs[k];
                 }
             }
+            
             backPropagation(difference_sums);
+
+            // std::cout << "MSE: [ ";
+            // for (int k = 0; k < outputs_amount; k++)
+            // {
+            //     difference_sums[k] *= difference_sums[k];
+            //     std::cout << " " << difference_sums[k] / batch_size << " ; ";
+            // }
+            // std::cout << "]" << std::endl;
+            std::cout << "Sample " << i * batch_size << " ";
+            printOutputs();
         }
-        std::cout << std::endl;
     }
     std::cout << "Training finished!" << std::endl;
-    test();
 }
 
 double** NeuralNetwork::getTest_x() {
