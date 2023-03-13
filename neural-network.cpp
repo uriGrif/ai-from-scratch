@@ -1,6 +1,7 @@
 #include "./headers/neural-network.h"
 #include "./headers/dataframe.h"
 #include <math.h>
+#include <float.h>
 
 Layer::Layer() {}
 
@@ -27,7 +28,7 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, int _activation_type) {
         weights[i] = new double[neurons_amount];
         weights_gradients[i] = new double[neurons_amount];
         for (int j = 0; j < neurons_amount + 1; j++) {
-            weights[i][j] = 0.001; //small number to avoid getting infinite values and nan
+            weights[i][j] = 0.5;
             weights_gradients[i][j] = 0;
         }
     }
@@ -62,15 +63,26 @@ double Layer::activate(double x) {
 }
 
 void Layer::calculateOutputs(double *results_vector) {
-    double max = 0;
+    double max = -DBL_MAX;
+    double *sums = new double[neurons_amount];
     for (int i = 0; i < neurons_amount; i++) {
-        double sum = 0;
+        sums[i] = 0;
         for (int j = 0; j <= inputs_amount; j++) {
-            sum += inputs[j] * weights[j][i];
+            sums[i] += inputs[j] * weights[j][i];
         }
-        deactivated_outputs[i] = sum;
-        results_vector[i] = activate(sum);
+        if (sums[i] > max) max = sums[i];
     }
+    for (int i = 0; i < neurons_amount; i++) {
+        if (activation_type == 1) {
+            // trick to avoid overflow and NaN values
+            results_vector[i] = activate(sums[i] - max);
+            deactivated_outputs[i] = sums[i] - max;
+        } else {
+            deactivated_outputs[i] = sums[i];
+            results_vector[i] = activate(sums[i]);
+        }
+    }
+    delete[] sums;
 }
 
 void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
@@ -88,10 +100,12 @@ void Layer::getActivationDerivatives(double *&neurons_activation_derivatives) {
             break;
         case 1:
             // softmax
+            sum = 0;
             for (int i = 0; i < neurons_amount; i++)
             {
                 sum += exp(deactivated_outputs[i]);
             }
+            // std::cout << "sum: " << sum << " ";
             for (int i = 0; i < neurons_amount; i++)
             {
                 neurons_activation_derivatives[i] = exp(deactivated_outputs[i]) / sum;
@@ -293,7 +307,7 @@ void NeuralNetwork::backPropagation(double *difference_sums) {
                 
                 // set dc/da * da/dz
                 // using Hadamard product
-                layers[i].setNeuronError(j, 2 * difference_sums[j] / batch_size * neurons_activation_derivatives[j]); 
+                layers[i].setNeuronError(j, -2 * difference_sums[j] / batch_size * neurons_activation_derivatives[j]); 
             } else {
                 // hidden layer
 
@@ -332,6 +346,10 @@ void NeuralNetwork::train() {
 
         for (int i = 0; i < (train_height / batch_size); i++)
         {
+            for (int k = 0; k < outputs_amount; k++)
+            {
+                difference_sums[k] = 0;
+            }
             for (int j = 0; j < batch_size; j++)
             {
                 setInputs(train_x[i * batch_size + j]);
