@@ -65,7 +65,7 @@ class NeuralNetwork {
         void fullyActivateLastLayer();
         void feedForward();
         void predict(double *_inputs, bool print_results=false);
-        void backPropagation(double *difference_sums);
+        void backPropagation();
         void train();
         void test();
         double **getTest_x();
