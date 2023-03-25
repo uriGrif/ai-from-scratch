@@ -367,10 +367,10 @@ void NeuralNetwork::backPropagation(double *diffs_sums)
 
                 // for (int k = 0; k < outputs_amount; k++)
                 // {
-                //     res += neurons_activation_derivatives_softmax[k][j] * (-2 * diffs_sums[k] / batch_size);
+                //     res += neurons_activation_derivatives_softmax[k][j] / 10 * (-2.0 * diffs_sums[k] / batch_size);
                 // }
 
-                double res = neurons_activation_derivatives_softmax[j][j] * (-2 * diffs_sums[j] / batch_size);
+                double res = neurons_activation_derivatives_softmax[j][j] * (-2.0 * diffs_sums[j] / batch_size);
 
                 // set dc/da * da/dz
                 layers[i].setNeuronError(j, res);
@@ -445,11 +445,11 @@ void NeuralNetwork::train()
                 {
                     if (train_y[i * batch_size + j] == k)
                     {
-                        diffs_sums[k] += outputs[k] - 1;
+                        diffs_sums[k] += 1 - outputs[k];
                     }
                     else
                     {
-                        diffs_sums[k] += outputs[k];
+                        diffs_sums[k] -= outputs[k];
                     }
                 }
             }
