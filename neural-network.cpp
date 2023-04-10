@@ -363,14 +363,14 @@ void NeuralNetwork::backPropagation(double *diffs_sums)
             {
                 // output layer
 
-                // double res = 0;
+                double res = 0;
 
-                // for (int k = 0; k < outputs_amount; k++)
-                // {
-                //     res += neurons_activation_derivatives_softmax[k][j] / 10 * (-2.0 * diffs_sums[k] / batch_size);
-                // }
+                for (int k = 0; k < outputs_amount; k++)
+                {
+                    res += neurons_activation_derivatives_softmax[k][j] * (-2.0 * diffs_sums[k] / batch_size);
+                }
 
-                double res = neurons_activation_derivatives_softmax[j][j] * (-2.0 * diffs_sums[j] / batch_size);
+                // double res = neurons_activation_derivatives_softmax[j][j] * (-2.0 * diffs_sums[j] / batch_size);
 
                 // set dc/da * da/dz
                 layers[i].setNeuronError(j, res);

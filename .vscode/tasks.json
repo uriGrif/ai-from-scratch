@@ -4,7 +4,7 @@
 		{
 			"type": "cppbuild",
 			"label": "C/C++: cpp.exe build active file",
-			"command": "E:\\w64devkit-1.12.0\\bin\\g++.exe",
+			"command": "g++.exe",
 			"args": [
 				"-fdiagnostics-color=always",
 				"-I",
@@ -19,7 +19,7 @@
 			},
 			"problemMatcher": ["$gcc"],
 			"group": "build",
-			"detail": "compiler: E:\\w64devkit-1.12.0\\bin\\g++.exe"
+			"detail": "compiler: g++.exe"
 		}
 	]
 }
