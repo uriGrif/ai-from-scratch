@@ -49,6 +49,8 @@
 		"iomanip": "cpp",
 		"sstream": "cpp",
 		"variant": "cpp",
-		"cfenv": "cpp"
+		"cfenv": "cpp",
+		"codecvt": "cpp",
+		"map": "cpp"
 	}
 }
