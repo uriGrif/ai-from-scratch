@@ -6,42 +6,40 @@
 
 // Activation functions
 
-Vector identity(Vector outputs)
+VectorXd identity(VectorXd outputs)
 {
     return outputs;
 }
 
-Matrix identityDerivative(Vector outputs)
+MatrixXd identityDerivative(VectorXd outputs)
 {
-    Matrix m;
-    m.push_back(Vector(outputs.size(), 1));
-    return m;
+    VectorXd v = VectorXd::Constant(outputs.size(), 1);
+    return v;
 }
 
-Vector relu(Vector outputs)
+VectorXd relu(VectorXd outputs)
 {
-    Vector activated;
+    VectorXd activated;
     for (int i = 0; i < outputs.size(); i++)
     {
-        activated.push_back(outputs[i] < 0 ? 0 : outputs[i]);
+        activated[i] = outputs[i] < 0 ? 0 : outputs[i];
     }
     return activated;
 }
 
-Matrix reluDerivative(Vector outputs)
+MatrixXd reluDerivative(VectorXd outputs)
 {
-    Matrix derivatives;
-    derivatives.push_back(Vector());
+    VectorXd derivatives;
     for (int i = 0; i < outputs.size(); i++)
     {
-        derivatives[0].push_back(outputs[i] < 0 ? 0 : 1);
+        derivatives[i] = outputs[i] < 0 ? 0 : 1;
     }
     return derivatives;
 }
 
-Vector softmax(Vector outputs)
+VectorXd softmax(VectorXd outputs)
 {
-    Vector activated;
+    VectorXd activated(outputs.size());
     double sum = 0;
     for (int i = 0; i < outputs.size(); i++)
     {
@@ -49,68 +47,65 @@ Vector softmax(Vector outputs)
     }
     for (int i = 0; i < outputs.size(); i++)
     {
-        activated.push_back(exp(outputs[i]) / sum);
+        activated[i] = (exp(outputs[i]) / sum);
     }
     return activated;
 }
 
-Matrix softmaxDerivative(Vector outputs)
+MatrixXd softmaxDerivative(VectorXd outputs)
 {
-    Matrix derivatives;
-    // for each output
+    MatrixXd derivatives(outputs.size(), outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        Vector v;
-        // for each neuron
         for (int j = 0; j < outputs.size(); j++)
         {
             if (i == j)
-                v.push_back(outputs[i] * (1 - outputs[i]));
+                derivatives(i, j) = outputs[i] * (1 - outputs[i]);
             else
-                v.push_back(-outputs[i] * outputs[j]);
+                derivatives(i, j) = -outputs[i] * outputs[j];
         }
-        derivatives.push_back(v);
     }
     return derivatives;
 }
 
 // Error calculation functions ------------------------------------------
 
-Vector categoricalCrossEntropy(Vector outputs, Vector labels)
+VectorXd categoricalCrossEntropy(VectorXd outputs, VectorXd labels)
 {
-    Vector loss;
+    VectorXd loss(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        loss.push_back(-labels[i] * log10(outputs[i]));
+        loss[i] = (-labels[i] * log10(outputs[i]));
     }
     return loss;
 }
 
-Vector categoricalCrossEntropyDerivative(Vector outputs, Vector labels)
+VectorXd categoricalCrossEntropyDerivative(VectorXd outputs, VectorXd labels)
 {
-    Vector derivatives;
+    VectorXd derivatives(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        derivatives.push_back(-labels[i] / outputs[i]);
+        derivatives[i] = -labels[i] / outputs[i];
     }
     return derivatives;
 }
 
-Vector meanSquare(Vector outputs, Vector labels)
+VectorXd meanSquare(VectorXd outputs, VectorXd labels)
 {
-    Vector loss;
+    VectorXd loss(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        loss.push_back(pow(labels[i] - outputs[i], 2));
+        loss[i] = pow(labels[i] - outputs[i], 2);
     }
+    return loss;
 }
 
-Vector meanSquareDerivative(Vector outputs, Vector labels)
+VectorXd meanSquareDerivative(VectorXd outputs, VectorXd labels)
 {
-    Vector derivatives;
+    VectorXd derivatives(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        derivatives.push_back(-2 * (labels[i] - outputs[i]));
+        derivatives[i] = -2 * (labels[i] - outputs[i]);
     }
     return derivatives;
 }
@@ -144,198 +139,38 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type)
         break;
     }
 
-    for (int i = 0; i < inputs_amount + 1; i++)
-    {
-        Vector row1, row2;
-        weights.push_back(row1);
-        weights_gradients.push_back(row2);
-        for (int j = 0; j < neurons_amount + 1; j++)
-        {
-            if (j == neurons_amount)
-                weights[i].push_back(1); // bias
-            else
-                weights[i].push_back(rand() / (double)RAND_MAX - 0.5);
-            weights_gradients[i].push_back(0);
-        }
-    }
+    weights = MatrixXd::Random(inputs_amount + 1, neurons_amount);
+    weights_gradients = MatrixXd::Zero(inputs_amount + 1, neurons_amount);
 }
 
-/*
-
-
-void Layer::setInputs(double *_inputs)
+VectorXd Layer::activate()
 {
-    for (int i = 0; i < inputs_amount; i++)
-    {
-        if (inputs_amount == 784)
-        {
-
-            inputs[i] = _inputs[i] / 255.0;
-        }
-        else
-        {
-            inputs[i] = _inputs[i];
-        }
-    }
+    return (*activ)(inputs * weights);
 }
 
-double Layer::activate(double x)
+VectorXd activationDerivatives();
+
+int Layer::get_inputs_amount() { return inputs_amount; }
+
+int Layer::get_neurons_amount() { return neurons_amount; }
+
+VectorXd Layer::get_outputs() { return activate(); }
+
+MatrixXd Layer::get_weights() { return weights; }
+
+VectorXd Layer::get_neurons_errors() { return neurons_errors; }
+
+void Layer::set_inputs(VectorXd _inputs)
 {
-    double res;
-    switch (activation_type)
-    {
-    case 0:
-        // ReLU
-        res = x < 0 ? 0 : x;
-        break;
-    case 1:
-        // softmax
-
-        // about NaN values: https://www.jeremyong.com/cpp/machine-learning/2020/10/23/cpp-neural-network-in-a-weekend/
-
-        res = exp(x); // This is partial activation, to get the actual activation you need to divide by the sum of all activations
-        break;
-    default:
-        break;
-    }
-    return res;
-}
-
-void Layer::calculateOutputs(double *results_vector)
-{
-    double max = -DBL_MAX;
-    double *sums = new double[neurons_amount];
-    for (int i = 0; i < neurons_amount; i++)
-    {
-        sums[i] = 0;
-        for (int j = 0; j <= inputs_amount; j++)
-        {
-            sums[i] += inputs[j] * weights[j][i];
-        }
-        if (sums[i] > max)
-            max = sums[i];
-    }
-    for (int i = 0; i < neurons_amount; i++)
-    {
-        if (activation_type == 1)
-        {
-            // trick to avoid overflow and NaN values
-            sums[i] -= max;
-        }
-        deactivated_outputs[i] = sums[i];
-        results_vector[i] = activate(sums[i]);
-    }
-    delete[] sums;
-}
-
-void Layer::getActivationDerivatives(double *&neurons_activation_derivatives)
-{
-    // returns da/dz (activation derivatives)
-    // it's a vector of size neurons_amount
-    // ReLU
-    for (int i = 0; i < neurons_amount; i++)
-    {
-        neurons_activation_derivatives[i] = deactivated_outputs[i] < 0 ? 0 : 1;
-    }
-}
-
-void Layer::getActivationDerivatives(double **&neurons_activation_derivatives)
-{
-    // returns da/dz (activation derivatives)
-    // it's a matrix of size neurons_amount x neurons_amount
-    // Softmax
-    double sum;
-    double output_aux;
-    sum = 0;
-    for (int i = 0; i < neurons_amount; i++)
-    {
-        sum += exp(deactivated_outputs[i]);
-    }
-    // for each output
-    for (int i = 0; i < neurons_amount; i++)
-    {
-        output_aux = exp(deactivated_outputs[i]) / sum;
-        // for each neuron
-        for (int j = 0; j < neurons_amount; j++)
-        {
-            if (i == j)
-                neurons_activation_derivatives[i][j] = output_aux * (1 - output_aux);
-            else
-                neurons_activation_derivatives[i][j] = -output_aux * exp(deactivated_outputs[j]) / sum;
-        }
-    }
-}
-
-int Layer::getInputsAmount()
-{
-    return inputs_amount;
-}
-
-int Layer::getNeuronsAmount()
-{
-    return neurons_amount;
-}
-
-double *Layer::getInputs()
-{
-    return inputs;
-}
-
-void Layer::setNeuronError(int neuron_index, double error)
-{
-    neurons_errors[neuron_index] = error;
-}
-
-double Layer::getNeuronError(int index)
-{
-    return neurons_errors[index];
-}
-
-double Layer::getWeight(int i, int j)
-{
-    return weights[i][j];
-}
-
-void Layer::deltaXWeights(double *&result)
-{
-    // matrix multiplication -> delta * weights (transpose) of next layer
-    for (int i = 0; i < inputs_amount; i++)
-    {
-        result[i] = 0;
-        for (int j = 0; j < neurons_amount; j++)
-        {
-            result[i] += neurons_errors[j] * weights[i][j];
-        }
-    }
-}
-
-void Layer::calculateWeightsGradients()
-{
-    // calculate weight gradients
-    // dC/dW = * (a^(L-1))^t * delta^L
-    for (int i = 0; i <= inputs_amount; i++)
-    {
-        for (int j = 0; j < neurons_amount; j++)
-        {
-            if (i == inputs_amount)
-                weights_gradients[i][j] = 1 * neurons_errors[j];
-            else
-                weights_gradients[i][j] = inputs[i] * neurons_errors[j];
-        }
-    }
+    inputs << _inputs, 1; // add an extra input with constant value 1 for the biases
 }
 
 void Layer::updateWeights(double learning_rate)
 {
-    // update weights
-    for (int i = 0; i <= inputs_amount; i++)
-    {
-        for (int j = 0; j < neurons_amount; j++)
-        {
-            weights[i][j] -= weights_gradients[i][j] * learning_rate;
-        }
-    }
+    weights += weights_gradients * learning_rate;
 }
+
+/*
 
 NeuralNetwork::NeuralNetwork() {}
 
@@ -351,12 +186,12 @@ NeuralNetwork::NeuralNetwork(int _layers_amount, int _inputs_amount, int _output
 
 void NeuralNetwork::setTrainData(DataFrame &df)
 {
-    df.getSimpleMatrix(train_x, train_y, train_height);
+    df.getSimpleMatrixXd(train_x, train_y, train_height);
 }
 
 void NeuralNetwork::setTestData(DataFrame &df)
 {
-    df.getSimpleMatrix(test_x, test_y, test_height);
+    df.getSimpleMatrixXd(test_x, test_y, test_height);
 }
 
 void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs)

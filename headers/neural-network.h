@@ -1,26 +1,31 @@
+#ifndef NEURAL_NETWORK_INCLUDED
+#define NEURAL_NETWORK_INCLUDED
+
 #include "./headers/dataframe.h"
 #include "./rapidcsv.h"
+#include <Eigen/Dense>
 
-typedef std::vector<double> Vector;
-typedef std::vector<std::vector<double>> Matrix;
-typedef Vector (*Activation_Function)(Vector);
-typedef Matrix (*Activation_Derivative_Function)(Vector);
-typedef Vector (*Error_Function)(Vector, Vector);
-typedef Vector (*Error_Derivative_Function)(Vector, Vector);
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
+
+typedef VectorXd (*Activation_Function)(VectorXd);
+typedef MatrixXd (*Activation_Derivative_Function)(VectorXd);
+typedef VectorXd (*Error_Function)(VectorXd, VectorXd);
+typedef VectorXd (*Error_Derivative_Function)(VectorXd, VectorXd);
 
 // Activation functions
-Vector identity(Vector outputs);
-Matrix identityDerivative(Vector outputs); // derivatives return a Jacobian matrix, which can eventually have a 1xN size, technically being a Vector
-Vector relu(Vector outputs);
-Matrix reluDerivative(Vector outputs);
-Vector softmax(Vector outputs);
-Matrix softmaxDerivative(Vector outputs);
+VectorXd identity(VectorXd outputs);
+MatrixXd identityDerivative(VectorXd outputs); // derivatives return a Jacobian matrix, which can eventually have a 1xN size, technically being a VectorXd
+VectorXd relu(VectorXd outputs);
+MatrixXd reluDerivative(VectorXd outputs);
+VectorXd softmax(VectorXd outputs);
+MatrixXd softmaxDerivative(VectorXd outputs);
 
 // Error calculation functions
-Vector categoricalCrossEntropy(Vector outputs, Vector labels);
-Vector categoricalCrossEntropyDerivative(Vector outputs, Vector labels);
-Vector meanSquare(Vector outputs, Vector labels);
-Vector meanSquareDerivative(Vector outputs, Vector labels);
+VectorXd categoricalCrossEntropy(VectorXd outputs, VectorXd labels);
+VectorXd categoricalCrossEntropyDerivative(VectorXd outputs, VectorXd labels);
+VectorXd meanSquare(VectorXd outputs, VectorXd labels);
+VectorXd meanSquareDerivative(VectorXd outputs, VectorXd labels);
 
 enum activation_type
 {
@@ -38,9 +43,9 @@ enum error_type
 class Layer
 {
 private:
-    Vector inputs;
-    Vector deactivated_outputs;
-    Matrix weights;
+    VectorXd inputs;
+    VectorXd deactivated_outputs;
+    MatrixXd weights;
 
     int inputs_amount;
     int neurons_amount;
@@ -48,21 +53,21 @@ private:
     Activation_Function activ;
     Activation_Derivative_Function activ_deriv;
 
-    Vector activate();              // simply calls (*activ)(params)
-    Vector activationDerivatives(); // simply calls (*activ_deriv)(params)
+    VectorXd activate();
+    VectorXd activationDerivatives();
 
-    Vector neurons_errors;
-    Matrix weights_gradients;
+    VectorXd neurons_errors;
+    MatrixXd weights_gradients;
 
 public:
     Layer();
     Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
-    int get_inputs_amont();
-    int get_neurons_amont();
-    int get_inputs();
-    Vector get_outputs();
-    Matrix get_weights();
-    Vector get_neurons_errors();
+    int get_inputs_amount();
+    int get_neurons_amount();
+    VectorXd get_outputs();
+    MatrixXd get_weights();
+    VectorXd get_neurons_errors();
+    void set_inputs(VectorXd _inputs);
     void updateWeights(double learning_rate);
 };
 
@@ -74,8 +79,8 @@ private:
 
     int label_column_index;
 
-    std::vector<Layer> layers;
-    Vector outputs;
+    Layer *layers;
+    VectorXd outputs;
 
     float learning_rate = 0.01f;
     int batch_size = 32;
@@ -88,10 +93,10 @@ private:
 public:
     NeuralNetwork();
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
-    void df_train(rapidcsv::Document _df_train);
-    void df_test(rapidcsv::Document _df_test);
+    void set_df_train(rapidcsv::Document _df_train);
+    void set_df_test(rapidcsv::Document _df_test);
     void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
-    void predict(Vector inputs, bool print_results = false);
+    void predict(VectorXd inputs, bool print_results = false);
     void train();
     void test();
 };
@@ -121,7 +126,7 @@ public:
     int getNeuronsAmount();
     void setInputs(double *_inputs);
     double *getInputs();
-    void calculateOutputs(double *results_vector);
+    void calculateOutputs(double *results_vectorXd);
     void getActivationDerivatives(double *&neurons_activation_derivatives);
     void getActivationDerivatives(double **&neurons_activation_derivatives);
     void setNeuronError(int index, double error);
@@ -172,3 +177,4 @@ public:
     void printOutputs();
 };
 */
+#endif
