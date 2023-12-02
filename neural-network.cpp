@@ -1,25 +1,25 @@
 #include "./headers/neural-network.h"
-#include "./headers/rapidcsv.h"
+#include "./headers/csv_to_eigen.h"
 #include <math.h>
 #include <float.h>
 #include <random>
 
-// Activation functions
+// Activation functions ----------------------------------------
 
-VectorXd identity(VectorXd outputs)
+RVectorXd identity(RVectorXd outputs)
 {
     return outputs;
 }
 
-MatrixXd identityDerivative(VectorXd outputs)
+MatrixXd identityDerivative(RVectorXd outputs)
 {
-    VectorXd v = VectorXd::Constant(outputs.size(), 1);
+    RVectorXd v = RVectorXd::Constant(outputs.size(), 1);
     return v;
 }
 
-VectorXd relu(VectorXd outputs)
+RVectorXd relu(RVectorXd outputs)
 {
-    VectorXd activated;
+    RVectorXd activated;
     for (int i = 0; i < outputs.size(); i++)
     {
         activated[i] = outputs[i] < 0 ? 0 : outputs[i];
@@ -27,9 +27,9 @@ VectorXd relu(VectorXd outputs)
     return activated;
 }
 
-MatrixXd reluDerivative(VectorXd outputs)
+MatrixXd reluDerivative(RVectorXd outputs)
 {
-    VectorXd derivatives;
+    RVectorXd derivatives;
     for (int i = 0; i < outputs.size(); i++)
     {
         derivatives[i] = outputs[i] < 0 ? 0 : 1;
@@ -37,9 +37,9 @@ MatrixXd reluDerivative(VectorXd outputs)
     return derivatives;
 }
 
-VectorXd softmax(VectorXd outputs)
+RVectorXd softmax(RVectorXd outputs)
 {
-    VectorXd activated(outputs.size());
+    RVectorXd activated(outputs.size());
     double sum = 0;
     for (int i = 0; i < outputs.size(); i++)
     {
@@ -52,7 +52,7 @@ VectorXd softmax(VectorXd outputs)
     return activated;
 }
 
-MatrixXd softmaxDerivative(VectorXd outputs)
+MatrixXd softmaxDerivative(RVectorXd outputs)
 {
     MatrixXd derivatives(outputs.size(), outputs.size());
     for (int i = 0; i < outputs.size(); i++)
@@ -70,29 +70,29 @@ MatrixXd softmaxDerivative(VectorXd outputs)
 
 // Error calculation functions ------------------------------------------
 
-VectorXd categoricalCrossEntropy(VectorXd outputs, VectorXd labels)
+RVectorXd categoricalCrossEntropy(RVectorXd outputs, RVectorXd labels)
 {
-    VectorXd loss(outputs.size());
+    RVectorXd loss(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        loss[i] = (-labels[i] * log10(outputs[i]));
+        loss[i] = (-labels[i] * log10(std::max(outputs[i], 1e-5)));
     }
     return loss;
 }
 
-VectorXd categoricalCrossEntropyDerivative(VectorXd outputs, VectorXd labels)
+RVectorXd categoricalCrossEntropyDerivative(RVectorXd outputs, RVectorXd labels)
 {
-    VectorXd derivatives(outputs.size());
+    RVectorXd derivatives(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        derivatives[i] = -labels[i] / outputs[i];
+        derivatives[i] = -labels[i] / std::max(outputs[i], 1e-5);
     }
     return derivatives;
 }
 
-VectorXd meanSquare(VectorXd outputs, VectorXd labels)
+RVectorXd meanSquare(RVectorXd outputs, RVectorXd labels)
 {
-    VectorXd loss(outputs.size());
+    RVectorXd loss(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
         loss[i] = pow(labels[i] - outputs[i], 2);
@@ -100,9 +100,9 @@ VectorXd meanSquare(VectorXd outputs, VectorXd labels)
     return loss;
 }
 
-VectorXd meanSquareDerivative(VectorXd outputs, VectorXd labels)
+RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels)
 {
-    VectorXd derivatives(outputs.size());
+    RVectorXd derivatives(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
         derivatives[i] = -2 * (labels[i] - outputs[i]);
@@ -143,26 +143,51 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type)
     weights_gradients = MatrixXd::Zero(inputs_amount + 1, neurons_amount);
 }
 
-VectorXd Layer::activate()
+RVectorXd Layer::activate()
 {
-    return (*activ)(inputs * weights);
+    deactivated_outputs = inputs * weights;
+    return (*activ)(deactivated_outputs);
 }
 
-VectorXd activationDerivatives();
+RVectorXd Layer::activationDerivatives()
+{
+    return (*activ_deriv)(deactivated_outputs);
+}
 
 int Layer::get_inputs_amount() { return inputs_amount; }
 
 int Layer::get_neurons_amount() { return neurons_amount; }
 
-VectorXd Layer::get_outputs() { return activate(); }
+RVectorXd Layer::get_outputs() { return activate(); }
 
 MatrixXd Layer::get_weights() { return weights; }
 
-VectorXd Layer::get_neurons_errors() { return neurons_errors; }
+RVectorXd Layer::calculate_neurons_errors(RVectorXd next_layer_neurons_errors, MatrixXd next_layer_weights)
+{
+    if (is_output_layer)
+    {
+        // loss derivatives * activation derivatives
+        neurons_errors = next_layer_neurons_errors * activationDerivatives(); // next_layer_neurons_errors is the loss function derivative
+    }
+    else
+    {
+        neurons_errors = (next_layer_neurons_errors * next_layer_weights.transpose()) * activationDerivatives();
+    }
+}
 
-void Layer::set_inputs(VectorXd _inputs)
+RVectorXd Layer::get_neurons_errors()
+{
+    return neurons_errors;
+}
+
+void Layer::set_inputs(RVectorXd _inputs)
 {
     inputs << _inputs, 1; // add an extra input with constant value 1 for the biases
+}
+
+void Layer::calculate_weight_gradients()
+{
+    weights_gradients = inputs.transpose() * neurons_errors;
 }
 
 void Layer::updateWeights(double learning_rate)
@@ -170,19 +195,193 @@ void Layer::updateWeights(double learning_rate)
     weights += weights_gradients * learning_rate;
 }
 
-/*
+void Layer::mark_as_output_layer()
+{
+    is_output_layer = true;
+}
+
+// ---------------------------------------------------------------------
+
+// NeuralNetwork definitions -------------------------------------------
 
 NeuralNetwork::NeuralNetwork() {}
 
-NeuralNetwork::NeuralNetwork(int _layers_amount, int _inputs_amount, int _outputs_amount)
+NeuralNetwork::NeuralNetwork(error_type err_func_type)
 {
-    layers_amount = _layers_amount;
-    inputs_amount = _inputs_amount;
-    outputs_amount = _outputs_amount;
-
-    layers = new Layer[_layers_amount];
-    outputs = new double[_outputs_amount];
+    switch (err_func_type)
+    {
+    case MEAN_SQUARE_ERROR:
+        err_func = &meanSquare;
+        err_func_derivative = &meanSquareDerivative;
+        break;
+    case CATEGORICAL_CROSS_ENTROPY:
+        err_func = &categoricalCrossEntropy;
+        err_func_derivative = &categoricalCrossEntropyDerivative;
+        break;
+    default:
+        break;
+    }
 }
+
+void NeuralNetwork::addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type)
+{
+    layers.push_back(Layer(_inputs_amount, _neurons_amount, _act_type));
+    layers_amount++;
+}
+
+void NeuralNetwork::set_df_train(const std::string &file)
+{
+    df_train = load_csv<MatrixXd>(file);
+    inputs_amount = df_train.cols() - 1;
+}
+
+void NeuralNetwork::set_df_test(const std::string &file)
+{
+    df_test = load_csv<MatrixXd>(file);
+}
+
+void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs)
+{
+    learning_rate = _learning_rate;
+    batch_size = _batch_size;
+    epochs = _epochs;
+}
+
+void NeuralNetwork::predict(RVectorXd inputs, bool print_results)
+{
+    layers[0].set_inputs(inputs);
+
+    for (int i = 0; i < layers_amount - 1; i++)
+    {
+        layers[i + 1].set_inputs(layers[i].get_outputs());
+    }
+
+    outputs = layers[layers_amount].get_outputs();
+
+    if (print_results)
+    {
+        printOutputs();
+    }
+}
+
+void NeuralNetwork::backPropagation() {}
+
+void NeuralNetwork::printOutputs() {}
+
+void NeuralNetwork::train()
+{
+    int train_size;
+    int outputs_amount = layers.back().get_neurons_amount();
+
+    RVectorXd loss_sums = MatrixXd::Zero(1, outputs_amount);
+    RVectorXd loss_derivatives_sums = MatrixXd::Zero(1, outputs_amount);
+
+    RVectorXd inputs_aux;
+    RVectorXd labels;
+
+    std::cout << "Training Samples: " << (train_size = df_train.rows()) << std::endl;
+    std::cout << "Training..." << std::endl;
+
+    for (int e = 0; e < epochs; e++)
+    {
+        std::cout << std::endl
+                  << "Epoch " << e + 1 << std::endl;
+
+        for (int i = 0; i < train_size / batch_size; i++)
+        {
+
+            for (int j = 0; j < batch_size; j++)
+            {
+                inputs_aux = df_train.block<1, -1>(i * batch_size + j, 1);
+                predict(inputs_aux);
+
+                // TODO: tener alguna forma de convertir el valor a labels --> si el valor es 2, entonces labels = [0,0,1,0,0,0,0,0,0,0]
+                // opcion: hacer una funcion que los convierta de esta forma o no, xq x ejemplo, si quiero solo comparar un valor: 32, entonces labels = [32]
+
+                loss_sums += (*err_func)(outputs, labels);
+                loss_derivatives_sums += (*err_func_derivative)(outputs, labels);
+            }
+
+            // for (int j = 0; j < batch_size; j++)
+            // {
+            //     setInputs(train_x[i * batch_size + j]);
+            //     feedForward();
+            //     fullyActivateLastLayer();
+            //     for (int k = 0; k < outputs_amount; k++)
+            //     {
+            //         if (train_y[i * batch_size + j] == k)
+            //         {
+            //             loss_sums[k] -= log(std::max(outputs[k], 1e-5)); // cross entropy
+            //             loss_derivatives[k] -= 1.0 / std::max(outputs[k], 1e-5);
+            //         }
+            //     }
+            // }
+            // for (int k = 0; k < outputs_amount; k++)
+            // {
+            //     loss_sums[k] /= batch_size; // average loss
+            // }
+        }
+    }
+    // double *loss_sums = new double[outputs_amount];
+    // double *loss_derivatives = new double[outputs_amount];
+    // double *aux_out;
+    // double aux_label;
+    // for (int e = 0; e < epochs; e++)
+    // {
+    //     std::cout << std::endl
+    //               << "Epoch " << e + 1 << std::endl;
+
+    //     for (int i = 0; i < (train_height / batch_size); i++)
+    //     {
+    //         for (int k = 0; k < outputs_amount; k++)
+    //         {
+    //             loss_sums[k] = 0;
+    //             loss_derivatives[k] = 0;
+    //         }
+    //         for (int j = 0; j < batch_size; j++)
+    //         {
+    //             setInputs(train_x[i * batch_size + j]);
+    //             feedForward();
+    //             fullyActivateLastLayer();
+    //             for (int k = 0; k < outputs_amount; k++)
+    //             {
+    //                 if (train_y[i * batch_size + j] == k)
+    //                 {
+    //                     loss_sums[k] -= log(std::max(outputs[k], 1e-5)); // cross entropy
+    //                     loss_derivatives[k] -= 1.0 / std::max(outputs[k], 1e-5);
+    //                 }
+    //             }
+    //         }
+    //         for (int k = 0; k < outputs_amount; k++)
+    //         {
+    //             loss_sums[k] /= batch_size; // average loss
+    //         }
+
+    //         if ((i + 1) * batch_size % 10000 == 0)
+    //         {
+    //             std::cout << "Average Loss: ";
+    //             double loss_sum = 0;
+    //             for (int k = 0; k < outputs_amount; k++)
+    //             {
+    //                 loss_sum += loss_sums[k];
+    //             }
+    //             std::cout << loss_sum / 10 << std::endl;
+
+    //             std::cout << "Sample " << (i + 1) * batch_size << " (Label: " << train_y[i * batch_size + batch_size - 1] << ") ";
+    //             printOutputs();
+    //         }
+
+    //         backPropagation(loss_derivatives);
+    //     }
+    // }
+    // std::cout << "Training finished!" << std::endl;
+}
+
+void NeuralNetwork::test() {}
+
+/*
+
+
 
 void NeuralNetwork::setTrainData(DataFrame &df)
 {
