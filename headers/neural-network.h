@@ -14,6 +14,7 @@ typedef RVectorXd (*Activation_Function)(RVectorXd);
 typedef MatrixXd (*Activation_Derivative_Function)(RVectorXd);
 typedef RVectorXd (*Error_Function)(RVectorXd, RVectorXd);
 typedef RVectorXd (*Error_Derivative_Function)(RVectorXd, RVectorXd);
+typedef RVectorXd (*Label_Generator_Function)(double, int);
 
 // Activation functions
 RVectorXd identity(RVectorXd outputs);
@@ -28,6 +29,10 @@ RVectorXd categoricalCrossEntropy(RVectorXd outputs, RVectorXd labels);
 RVectorXd categoricalCrossEntropyDerivative(RVectorXd outputs, RVectorXd labels);
 RVectorXd meanSquare(RVectorXd outputs, RVectorXd labels);
 RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels);
+
+// Label Generator Functions
+RVectorXd numberRecognitionLabelGenerator(double correct_label, int size);
+RVectorXd simpleValueLabelGenerator(double correct_label, int size);
 
 enum activation_type
 {
@@ -54,7 +59,6 @@ private:
 
     Activation_Function activ;
     Activation_Derivative_Function activ_deriv;
-
     RVectorXd activate();
     RVectorXd activationDerivatives();
 
@@ -70,7 +74,7 @@ public:
     int get_neurons_amount();
     RVectorXd get_outputs();
     MatrixXd get_weights();
-    RVectorXd calculate_neurons_errors(RVectorXd next_layer_neurons_errors, MatrixXd next_layer_weights);
+    RVectorXd calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives = nullptr);
     RVectorXd get_neurons_errors();
     void calculate_weight_gradients();
     void set_inputs(RVectorXd _inputs);
@@ -92,6 +96,7 @@ private:
 
     Error_Function err_func;
     Error_Derivative_Function err_func_derivative;
+    Label_Generator_Function label_gen_func;
 
     float learning_rate = 0.01f;
     int batch_size = 32;
@@ -99,12 +104,13 @@ private:
 
     int layers_amount = 0;
 
-    void backPropagation();
+    void backPropagation(RVectorXd loss_derivatives_sums);
     void printOutputs();
+    void printBatchInfo(int epoch, RVectorXd loss_sums, double show_sample_output = false, double label);
 
 public:
     NeuralNetwork();
-    NeuralNetwork(error_type err_func_type);
+    NeuralNetwork(error_type err_func_type, Label_Generator_Function &_label_gen_func);
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
     void set_df_train(const std::string &file);
     void set_df_test(const std::string &file);

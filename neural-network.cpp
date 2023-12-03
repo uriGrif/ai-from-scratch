@@ -4,6 +4,21 @@
 #include <float.h>
 #include <random>
 
+// UTILS -------------------------------------------------------
+
+void removeColumn(RVectorXd &matrix, unsigned int colToRemove)
+{
+    unsigned int numRows = matrix.rows();
+    unsigned int numCols = matrix.cols() - 1;
+
+    if (colToRemove < numCols)
+        matrix.block(0, colToRemove, numRows, numCols - colToRemove) = matrix.rightCols(numCols - colToRemove);
+
+    matrix.conservativeResize(numRows, numCols);
+}
+
+// -------------------------------------------------------------
+
 // Activation functions ----------------------------------------
 
 RVectorXd identity(RVectorXd outputs)
@@ -112,6 +127,24 @@ RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels)
 
 // -------------------------------------------------------------
 
+// Label Generator Functions -----------------------------------
+
+RVectorXd numberRecognitionLabelGenerator(double correct_label, int size)
+{
+    RVectorXd labels = MatrixXd::Zero(1, size);
+    labels(0, (int)correct_label) = 1;
+    return labels;
+}
+
+RVectorXd simpleValueLabelGenerator(double correct_label, int size)
+{
+    RVectorXd labels;
+    labels << correct_label;
+    return labels;
+}
+
+// -------------------------------------------------------------
+
 // Layer definitions -------------------------------------------
 
 Layer::Layer() {}
@@ -162,16 +195,16 @@ RVectorXd Layer::get_outputs() { return activate(); }
 
 MatrixXd Layer::get_weights() { return weights; }
 
-RVectorXd Layer::calculate_neurons_errors(RVectorXd next_layer_neurons_errors, MatrixXd next_layer_weights)
+RVectorXd Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives)
 {
-    if (is_output_layer)
+    if (next_layer == nullptr)
     {
         // loss derivatives * activation derivatives
-        neurons_errors = next_layer_neurons_errors * activationDerivatives(); // next_layer_neurons_errors is the loss function derivative
+        neurons_errors = *loss_derivatives * activationDerivatives(); // next_layer_neurons_errors is the loss function derivative
     }
     else
     {
-        neurons_errors = (next_layer_neurons_errors * next_layer_weights.transpose()) * activationDerivatives();
+        neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights().transpose()) * activationDerivatives();
     }
 }
 
@@ -206,8 +239,9 @@ void Layer::mark_as_output_layer()
 
 NeuralNetwork::NeuralNetwork() {}
 
-NeuralNetwork::NeuralNetwork(error_type err_func_type)
+NeuralNetwork::NeuralNetwork(error_type err_func_type, Label_Generator_Function &_label_gen_func)
 {
+    label_gen_func = _label_gen_func;
     switch (err_func_type)
     {
     case MEAN_SQUARE_ERROR:
@@ -264,9 +298,38 @@ void NeuralNetwork::predict(RVectorXd inputs, bool print_results)
     }
 }
 
-void NeuralNetwork::backPropagation() {}
+void NeuralNetwork::backPropagation(RVectorXd loss_derivatives_sums)
+{
 
-void NeuralNetwork::printOutputs() {}
+    layers[layers_amount - 1].calculate_neurons_errors(nullptr, &loss_derivatives_sums);
+    for (int i = layers_amount - 2; i >= 0; i--)
+    {
+        layers[i].calculate_neurons_errors(&layers[i + 1]);
+    }
+
+    for (int i = 0; i < layers_amount; i++)
+    {
+        layers[i].calculate_weight_gradients();
+        layers[i].updateWeights(learning_rate);
+    }
+}
+
+void NeuralNetwork::printOutputs()
+{
+    Eigen::IOFormat CleanFmt(Eigen::StreamPrecision, 0, ", ", "\n", "[", "]");
+    std::cout << outputs.format(CleanFmt) << std::endl;
+}
+
+void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double show_sample_output, double label)
+{
+    std::cout << "Batch Number: " << batch_number << " --- ";
+    std::cout << "Average Loss: " << loss_sums.mean() << std::endl;
+    if (show_sample_output)
+    {
+        std::cout << "Sample --> Label: " << label << " Output: ";
+        printOutputs();
+    }
+}
 
 void NeuralNetwork::train()
 {
@@ -282,99 +345,50 @@ void NeuralNetwork::train()
     std::cout << "Training Samples: " << (train_size = df_train.rows()) << std::endl;
     std::cout << "Training..." << std::endl;
 
-    for (int e = 0; e < epochs; e++)
+    try
     {
-        std::cout << std::endl
-                  << "Epoch " << e + 1 << std::endl;
 
-        for (int i = 0; i < train_size / batch_size; i++)
+        for (int e = 0; e < epochs; e++)
         {
 
-            for (int j = 0; j < batch_size; j++)
+            std::cout << std::endl
+                      << "Epoch " << e + 1 << std::endl;
+
+            for (int i = 0; i < train_size / batch_size; i++)
             {
-                inputs_aux = df_train.block<1, -1>(i * batch_size + j, 1);
-                predict(inputs_aux);
 
-                // TODO: tener alguna forma de convertir el valor a labels --> si el valor es 2, entonces labels = [0,0,1,0,0,0,0,0,0,0]
-                // opcion: hacer una funcion que los convierta de esta forma o no, xq x ejemplo, si quiero solo comparar un valor: 32, entonces labels = [32]
+                for (int j = 0; j < batch_size; j++)
+                {
+                    inputs_aux = df_train.row(i * batch_size + j);
+                    removeColumn(inputs_aux, label_column_index);
+                    predict(inputs_aux);
 
-                loss_sums += (*err_func)(outputs, labels);
-                loss_derivatives_sums += (*err_func_derivative)(outputs, labels);
+                    if (outputs.hasNaN())
+                    {
+                        throw 1;
+                    }
+
+                    labels = (*label_gen_func)(df_train(i * batch_size + j, label_column_index), outputs_amount);
+
+                    loss_sums += (*err_func)(outputs, labels);
+                    loss_derivatives_sums += (*err_func_derivative)(outputs, labels);
+                }
+
+                loss_sums /= batch_size; // average loss
+                loss_derivatives_sums /= batch_size;
+
+                printBatchInfo(e + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index));
             }
 
-            // for (int j = 0; j < batch_size; j++)
-            // {
-            //     setInputs(train_x[i * batch_size + j]);
-            //     feedForward();
-            //     fullyActivateLastLayer();
-            //     for (int k = 0; k < outputs_amount; k++)
-            //     {
-            //         if (train_y[i * batch_size + j] == k)
-            //         {
-            //             loss_sums[k] -= log(std::max(outputs[k], 1e-5)); // cross entropy
-            //             loss_derivatives[k] -= 1.0 / std::max(outputs[k], 1e-5);
-            //         }
-            //     }
-            // }
-            // for (int k = 0; k < outputs_amount; k++)
-            // {
-            //     loss_sums[k] /= batch_size; // average loss
-            // }
+            backPropagation(loss_derivatives_sums);
         }
     }
-    // double *loss_sums = new double[outputs_amount];
-    // double *loss_derivatives = new double[outputs_amount];
-    // double *aux_out;
-    // double aux_label;
-    // for (int e = 0; e < epochs; e++)
-    // {
-    //     std::cout << std::endl
-    //               << "Epoch " << e + 1 << std::endl;
+    catch (...)
+    {
+        std::cerr << "Error! Prediction resulted in NaN" << '\n';
+    }
 
-    //     for (int i = 0; i < (train_height / batch_size); i++)
-    //     {
-    //         for (int k = 0; k < outputs_amount; k++)
-    //         {
-    //             loss_sums[k] = 0;
-    //             loss_derivatives[k] = 0;
-    //         }
-    //         for (int j = 0; j < batch_size; j++)
-    //         {
-    //             setInputs(train_x[i * batch_size + j]);
-    //             feedForward();
-    //             fullyActivateLastLayer();
-    //             for (int k = 0; k < outputs_amount; k++)
-    //             {
-    //                 if (train_y[i * batch_size + j] == k)
-    //                 {
-    //                     loss_sums[k] -= log(std::max(outputs[k], 1e-5)); // cross entropy
-    //                     loss_derivatives[k] -= 1.0 / std::max(outputs[k], 1e-5);
-    //                 }
-    //             }
-    //         }
-    //         for (int k = 0; k < outputs_amount; k++)
-    //         {
-    //             loss_sums[k] /= batch_size; // average loss
-    //         }
-
-    //         if ((i + 1) * batch_size % 10000 == 0)
-    //         {
-    //             std::cout << "Average Loss: ";
-    //             double loss_sum = 0;
-    //             for (int k = 0; k < outputs_amount; k++)
-    //             {
-    //                 loss_sum += loss_sums[k];
-    //             }
-    //             std::cout << loss_sum / 10 << std::endl;
-
-    //             std::cout << "Sample " << (i + 1) * batch_size << " (Label: " << train_y[i * batch_size + batch_size - 1] << ") ";
-    //             printOutputs();
-    //         }
-
-    //         backPropagation(loss_derivatives);
-    //     }
-    // }
-    // std::cout << "Training finished!" << std::endl;
+    std::cout << "Training finished!" << std::endl;
 }
 
 void NeuralNetwork::test() {}
