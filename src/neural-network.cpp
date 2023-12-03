@@ -3,6 +3,7 @@
 #include <math.h>
 #include <float.h>
 #include <random>
+#include <iostream>
 
 // UTILS -------------------------------------------------------
 
@@ -195,7 +196,7 @@ RVectorXd Layer::get_outputs() { return activate(); }
 
 MatrixXd Layer::get_weights() { return weights; }
 
-RVectorXd Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives)
+void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives)
 {
     if (next_layer == nullptr)
     {
@@ -206,6 +207,7 @@ RVectorXd Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_der
     {
         neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights().transpose()) * activationDerivatives();
     }
+    return;
 }
 
 RVectorXd Layer::get_neurons_errors()
@@ -239,7 +241,7 @@ void Layer::mark_as_output_layer()
 
 NeuralNetwork::NeuralNetwork() {}
 
-NeuralNetwork::NeuralNetwork(error_type err_func_type, Label_Generator_Function &_label_gen_func)
+NeuralNetwork::NeuralNetwork(error_type err_func_type, Label_Generator_Function _label_gen_func)
 {
     label_gen_func = _label_gen_func;
     switch (err_func_type)
@@ -320,7 +322,7 @@ void NeuralNetwork::printOutputs()
     std::cout << outputs.format(CleanFmt) << std::endl;
 }
 
-void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double show_sample_output, double label)
+void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double label, double show_sample_output)
 {
     std::cout << "Batch Number: " << batch_number << " --- ";
     std::cout << "Average Loss: " << loss_sums.mean() << std::endl;

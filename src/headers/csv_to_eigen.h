@@ -1,3 +1,6 @@
+#ifndef CSV_TO_EIGEN_INCLUDED
+#define CSV_TO_EIGEN_INCLUDED
+
 #include <Eigen/Dense>
 #include <vector>
 #include <fstream>
@@ -11,7 +14,7 @@ M load_csv(const std::string &path)
     indata.open(path);
     std::string line;
     std::vector<double> values;
-    uint rows = 0;
+    int rows = 0;
     while (std::getline(indata, line))
     {
         std::stringstream lineStream(line);
@@ -24,3 +27,5 @@ M load_csv(const std::string &path)
     }
     return Map<const Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, RowMajor>>(values.data(), rows, values.size() / rows);
 }
+
+#endif

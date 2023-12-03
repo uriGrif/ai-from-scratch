@@ -1,8 +1,7 @@
 #ifndef NEURAL_NETWORK_INCLUDED
 #define NEURAL_NETWORK_INCLUDED
 
-#include "./headers/dataframe.h"
-#include "./headers/csv_to_eigen.h"
+#include "csv_to_eigen.h"
 #include <vector>
 #include <Eigen/Dense>
 
@@ -74,7 +73,7 @@ public:
     int get_neurons_amount();
     RVectorXd get_outputs();
     MatrixXd get_weights();
-    RVectorXd calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives = nullptr);
+    void calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives = nullptr);
     RVectorXd get_neurons_errors();
     void calculate_weight_gradients();
     void set_inputs(RVectorXd _inputs);
@@ -106,11 +105,11 @@ private:
 
     void backPropagation(RVectorXd loss_derivatives_sums);
     void printOutputs();
-    void printBatchInfo(int epoch, RVectorXd loss_sums, double show_sample_output = false, double label);
+    void printBatchInfo(int epoch, RVectorXd loss_sums, double label, double show_sample_output = false);
 
 public:
     NeuralNetwork();
-    NeuralNetwork(error_type err_func_type, Label_Generator_Function &_label_gen_func);
+    NeuralNetwork(error_type err_func_type, Label_Generator_Function _label_gen_func);
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
     void set_df_train(const std::string &file);
     void set_df_test(const std::string &file);
