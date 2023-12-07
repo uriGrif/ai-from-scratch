@@ -73,6 +73,7 @@ public:
     int get_neurons_amount();
     RVectorXd get_outputs();
     MatrixXd get_weights();
+    MatrixXd get_weights_without_bias();
     void calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives = nullptr);
     RVectorXd get_neurons_errors();
     void calculate_weight_gradients();

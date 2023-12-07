@@ -18,6 +18,17 @@ void removeColumn(RVectorXd &matrix, unsigned int colToRemove)
     matrix.conservativeResize(numRows, numCols);
 }
 
+void removeRow(MatrixXd &matrix, unsigned int rowToRemove)
+{
+    unsigned int numRows = matrix.rows() - 1;
+    unsigned int numCols = matrix.cols();
+
+    if (rowToRemove < numRows)
+        matrix.block(rowToRemove, 0, numRows - rowToRemove, numCols) = matrix.bottomRows(numRows - rowToRemove);
+
+    matrix.conservativeResize(numRows, numCols);
+}
+
 // -------------------------------------------------------------
 
 // Activation functions ----------------------------------------
@@ -60,16 +71,10 @@ MatrixXd reluDerivative(RVectorXd outputs)
 RVectorXd softmax(RVectorXd outputs)
 {
     RVectorXd activated(outputs.size());
-    double sum = 0;
     double max_value = outputs.maxCoeff();
-    for (int i = 0; i < outputs.size(); i++)
-    {
-        sum += exp(outputs[i] - max_value);
-    }
-    for (int i = 0; i < outputs.size(); i++)
-    {
-        activated[i] = (exp(outputs[i] - max_value) / sum);
-    }
+    outputs = outputs.array() - max_value;
+    activated = (outputs.array()).exp();
+    activated /= activated.sum();
     return activated;
 }
 
@@ -77,6 +82,8 @@ MatrixXd softmaxDerivative(RVectorXd outputs)
 {
     int size = outputs.size();
     MatrixXd derivatives(size, size);
+    double max_value = outputs.maxCoeff();
+    outputs = outputs.array() - max_value;
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
@@ -191,12 +198,6 @@ RVectorXd Layer::activate()
 
 MatrixXd Layer::activationDerivatives()
 {
-    RVectorXd aux_deactivated_outputs = deactivated_outputs;
-    if (!is_output_layer)
-    {
-        deactivated_outputs.conservativeResize(neurons_amount + 1);
-        deactivated_outputs[neurons_amount] = 1; // set an extra output representing the bias.
-    }
     return (*activ_deriv)(deactivated_outputs);
 }
 
@@ -208,6 +209,13 @@ RVectorXd Layer::get_outputs() { return activate(); }
 
 MatrixXd Layer::get_weights() { return weights; }
 
+MatrixXd Layer::get_weights_without_bias()
+{
+    MatrixXd aux = weights;
+    removeRow(aux, inputs_amount);
+    return aux;
+}
+
 void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives)
 {
     if (next_layer == nullptr)
@@ -216,11 +224,7 @@ void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivati
     }
     else
     {
-        std::cout << "ERROR 2\n";
-        std::cout << (*next_layer).get_neurons_errors().size() << std::endl; // 65
-        std::cout << (*next_layer).get_weights().size() << std::endl;        // 8256
-        std::cout << activationDerivatives().size() << std::endl;            // 16641
-        neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights().transpose()) * activationDerivatives();
+        neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights_without_bias().transpose()) * activationDerivatives();
     }
     return;
 }
@@ -382,6 +386,7 @@ void NeuralNetwork::train()
                 {
                     inputs_aux = df_train.row(i * batch_size + j);
                     removeColumn(inputs_aux, label_column_index);
+                    // inputs_aux /= inputs_aux.maxCoeff();
                     predict(inputs_aux);
 
                     if (outputs.hasNaN())
@@ -411,266 +416,3 @@ void NeuralNetwork::train()
 }
 
 void NeuralNetwork::test() {}
-
-/*
-
-
-
-void NeuralNetwork::setTrainData(DataFrame &df)
-{
-    df.getSimpleMatrixXd(train_x, train_y, train_height);
-}
-
-void NeuralNetwork::setTestData(DataFrame &df)
-{
-    df.getSimpleMatrixXd(test_x, test_y, test_height);
-}
-
-void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs)
-{
-    learning_rate = _learning_rate;
-    batch_size = _batch_size;
-    epochs = _epochs;
-}
-
-void NeuralNetwork::setLayer(int index, int inputs_amount, int neurons_amount, int activation_type)
-{
-    layers[index] = Layer(inputs_amount, neurons_amount, activation_type);
-}
-
-void NeuralNetwork::setInputs(double *_inputs)
-{
-    layers[0].setInputs(_inputs);
-}
-
-void NeuralNetwork::feedForward()
-{
-    for (int i = 0; i < layers_amount; i++)
-    {
-        if (i == layers_amount - 1)
-        {
-            layers[i].calculateOutputs(outputs);
-        }
-        else
-        {
-            layers[i].calculateOutputs(layers[i + 1].getInputs());
-        }
-    }
-}
-
-void NeuralNetwork::fullyActivateLastLayer()
-{
-    // get actual activation from softmax in the output layer
-    // divide by de sum of all activations
-    double sum = 0;
-    for (int i = 0; i < outputs_amount; i++)
-    {
-        sum += outputs[i];
-    }
-    for (int i = 0; i < outputs_amount; i++)
-    {
-        outputs[i] /= sum;
-    }
-}
-
-void NeuralNetwork::printOutputs()
-{
-    std::cout << "Output: [ ";
-    for (int i = 0; i < outputs_amount; i++)
-    {
-        std::cout << outputs[i] << " ; ";
-    }
-    std::cout << "]" << std::endl;
-}
-
-void NeuralNetwork::predict(double *_inputs, bool print_results)
-{
-    setInputs(_inputs);
-    feedForward();
-    fullyActivateLastLayer();
-
-    if (print_results)
-    {
-        std::cout << "Predicted output: [ ";
-        for (int i = 0; i < outputs_amount; i++)
-        {
-            std::cout << outputs[i] << " ; ";
-        }
-        std::cout << "]" << std::endl;
-    }
-}
-
-void NeuralNetwork::test()
-{
-    double prediction;
-    double error;
-    double error_accum = 0;
-    int test_label;
-
-    std::cout << "Testing model..." << std::endl;
-
-    for (int i = 0; i < test_height; i++)
-    {
-        predict(test_x[i]);
-        for (int j = 0; j < outputs_amount; j++)
-        {
-            if (test_y[i] == j)
-            {
-                prediction = outputs[j];
-                error = 100 - (prediction * 100);
-                if (error < 0)
-                    error *= -1;
-                error_accum += error;
-            }
-        }
-    }
-    double avg_error = error_accum / test_height;
-    std::cout << "The model is " << 100 - avg_error << "% accurate!" << std::endl;
-}
-
-void NeuralNetwork::backPropagation(double *loss_derivatives)
-{
-
-    double *neurons_activation_derivatives;          // da/dz
-    double **neurons_activation_derivatives_softmax; // da/dz
-    double *auxDeltaXWeights;
-
-    // calculate weights gradient for each layer
-    for (int i = layers_amount - 1; i >= 0; i--)
-    {
-
-        // delta^L
-        if (i == layers_amount - 1)
-        {
-            neurons_activation_derivatives_softmax = new double *[outputs_amount];
-            for (int j = 0; j < outputs_amount; j++)
-            {
-                neurons_activation_derivatives_softmax[j] = new double[outputs_amount];
-            }
-            layers[i].getActivationDerivatives(neurons_activation_derivatives_softmax); // da/dz
-
-            for (int j = 0; j < layers[i].getNeuronsAmount(); j++)
-            {
-                // output layer
-
-                double res = 0;
-
-                for (int k = 0; k < outputs_amount; k++)
-                {
-                    res += neurons_activation_derivatives_softmax[k][j] * loss_derivatives[k] / batch_size;
-                }
-
-                // double res = neurons_activation_derivatives_softmax[j][j] * (-2.0 * diffs_sums[j] / batch_size);
-
-                // set dc/da * da/dz
-                layers[i].setNeuronError(j, res);
-            }
-
-            for (int j = 0; j < outputs_amount; j++)
-            {
-                delete[] neurons_activation_derivatives_softmax[j];
-            }
-            delete[] neurons_activation_derivatives_softmax;
-        }
-        else
-        {
-            neurons_activation_derivatives = new double[layers[i].getNeuronsAmount()];
-            layers[i].getActivationDerivatives(neurons_activation_derivatives); // da/dz
-
-            for (int j = 0; j < layers[i].getNeuronsAmount(); j++)
-            {
-
-                // hidden layers
-
-                auxDeltaXWeights = new double[layers[i].getNeuronsAmount()];
-
-                layers[i + 1].deltaXWeights(auxDeltaXWeights);
-
-                // using Hadamard product
-                layers[i].setNeuronError(j, auxDeltaXWeights[j] * neurons_activation_derivatives[j]);
-
-                delete[] auxDeltaXWeights;
-            }
-
-            delete[] neurons_activation_derivatives;
-        }
-
-        // calculate weight gradients
-        layers[i].calculateWeightsGradients();
-    }
-
-    // update weights
-    for (int i = 0; i < layers_amount; i++)
-    {
-        layers[i].updateWeights(learning_rate);
-    }
-}
-
-void NeuralNetwork::train()
-{
-    std::cout << "Training..." << std::endl;
-    std::cout << "Training Samples: " << train_height << std::endl;
-    double *loss_sums = new double[outputs_amount];
-    double *loss_derivatives = new double[outputs_amount];
-    double *aux_out;
-    double aux_label;
-    for (int e = 0; e < epochs; e++)
-    {
-        std::cout << std::endl
-                  << "Epoch " << e + 1 << std::endl;
-
-        for (int i = 0; i < (train_height / batch_size); i++)
-        {
-            for (int k = 0; k < outputs_amount; k++)
-            {
-                loss_sums[k] = 0;
-                loss_derivatives[k] = 0;
-            }
-            for (int j = 0; j < batch_size; j++)
-            {
-                setInputs(train_x[i * batch_size + j]);
-                feedForward();
-                fullyActivateLastLayer();
-                for (int k = 0; k < outputs_amount; k++)
-                {
-                    if (train_y[i * batch_size + j] == k)
-                    {
-                        loss_sums[k] -= log(std::max(outputs[k], 1e-5)); // cross entropy
-                        loss_derivatives[k] -= 1.0 / std::max(outputs[k], 1e-5);
-                    }
-                }
-            }
-            for (int k = 0; k < outputs_amount; k++)
-            {
-                loss_sums[k] /= batch_size; // average loss
-            }
-
-            if ((i + 1) * batch_size % 10000 == 0)
-            {
-                std::cout << "Average Loss: ";
-                double loss_sum = 0;
-                for (int k = 0; k < outputs_amount; k++)
-                {
-                    loss_sum += loss_sums[k];
-                }
-                std::cout << loss_sum / 10 << std::endl;
-
-                std::cout << "Sample " << (i + 1) * batch_size << " (Label: " << train_y[i * batch_size + batch_size - 1] << ") ";
-                printOutputs();
-            }
-
-            backPropagation(loss_derivatives);
-        }
-    }
-    std::cout << "Training finished!" << std::endl;
-}
-
-double **NeuralNetwork::getTest_x()
-{
-    return test_x;
-}
-
-double *NeuralNetwork::getTest_y()
-{
-    return test_y;
-} */
