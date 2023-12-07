@@ -1,4 +1,4 @@
-CPP_FLAGS = -g -Wall -I $(CURRENT_DIR)
+CPP_FLAGS = -g -Wall -I ./
 SRC_DIR = ./src/
 BUILD_DIR = ./build/
 CURRENT_DIR = $(shell pwd)

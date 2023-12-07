@@ -59,7 +59,7 @@ private:
     Activation_Function activ;
     Activation_Derivative_Function activ_deriv;
     RVectorXd activate();
-    RVectorXd activationDerivatives();
+    MatrixXd activationDerivatives();
 
     MatrixXd weights_gradients;
     RVectorXd neurons_errors;
@@ -99,7 +99,7 @@ private:
 
     float learning_rate = 0.01f;
     int batch_size = 32;
-    int epochs = 1000;
+    int epochs = 50;
 
     int layers_amount = 0;
 
@@ -111,8 +111,8 @@ public:
     NeuralNetwork();
     NeuralNetwork(error_type err_func_type, Label_Generator_Function _label_gen_func);
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
-    void set_df_train(const std::string &file);
-    void set_df_test(const std::string &file);
+    void set_df_train(const std::string &file, int _label_column_index);
+    void set_df_test(const std::string &file, int _label_column_index);
     void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
     void predict(RVectorXd inputs, bool print_results = false);
     void train();

@@ -29,13 +29,15 @@ RVectorXd identity(RVectorXd outputs)
 
 MatrixXd identityDerivative(RVectorXd outputs)
 {
-    RVectorXd v = RVectorXd::Constant(outputs.size(), 1);
+    int size = outputs.size();
+    MatrixXd v = MatrixXd::Identity(size, size);
     return v;
 }
 
 RVectorXd relu(RVectorXd outputs)
 {
     RVectorXd activated;
+    activated.resize(1, outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
         activated[i] = outputs[i] < 0 ? 0 : outputs[i];
@@ -45,10 +47,12 @@ RVectorXd relu(RVectorXd outputs)
 
 MatrixXd reluDerivative(RVectorXd outputs)
 {
-    RVectorXd derivatives;
-    for (int i = 0; i < outputs.size(); i++)
+    int size = outputs.size();
+    MatrixXd derivatives = MatrixXd::Zero(size, size);
+    for (int i = 0; i < size; i++)
     {
-        derivatives[i] = outputs[i] < 0 ? 0 : 1;
+        if (outputs[i] < 0)
+            derivatives(i, i) = 1;
     }
     return derivatives;
 }
@@ -57,23 +61,25 @@ RVectorXd softmax(RVectorXd outputs)
 {
     RVectorXd activated(outputs.size());
     double sum = 0;
+    double max_value = outputs.maxCoeff();
     for (int i = 0; i < outputs.size(); i++)
     {
-        sum += exp(outputs[i]);
+        sum += exp(outputs[i] - max_value);
     }
     for (int i = 0; i < outputs.size(); i++)
     {
-        activated[i] = (exp(outputs[i]) / sum);
+        activated[i] = (exp(outputs[i] - max_value) / sum);
     }
     return activated;
 }
 
 MatrixXd softmaxDerivative(RVectorXd outputs)
 {
-    MatrixXd derivatives(outputs.size(), outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    int size = outputs.size();
+    MatrixXd derivatives(size, size);
+    for (int i = 0; i < size; i++)
     {
-        for (int j = 0; j < outputs.size(); j++)
+        for (int j = 0; j < size; j++)
         {
             if (i == j)
                 derivatives(i, j) = outputs[i] * (1 - outputs[i]);
@@ -183,8 +189,14 @@ RVectorXd Layer::activate()
     return (*activ)(deactivated_outputs);
 }
 
-RVectorXd Layer::activationDerivatives()
+MatrixXd Layer::activationDerivatives()
 {
+    RVectorXd aux_deactivated_outputs = deactivated_outputs;
+    if (!is_output_layer)
+    {
+        deactivated_outputs.conservativeResize(neurons_amount + 1);
+        deactivated_outputs[neurons_amount] = 1; // set an extra output representing the bias.
+    }
     return (*activ_deriv)(deactivated_outputs);
 }
 
@@ -200,11 +212,14 @@ void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivati
 {
     if (next_layer == nullptr)
     {
-        // loss derivatives * activation derivatives
-        neurons_errors = *loss_derivatives * activationDerivatives(); // next_layer_neurons_errors is the loss function derivative
+        neurons_errors = (*loss_derivatives) * activationDerivatives();
     }
     else
     {
+        std::cout << "ERROR 2\n";
+        std::cout << (*next_layer).get_neurons_errors().size() << std::endl; // 65
+        std::cout << (*next_layer).get_weights().size() << std::endl;        // 8256
+        std::cout << activationDerivatives().size() << std::endl;            // 16641
         neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights().transpose()) * activationDerivatives();
     }
     return;
@@ -217,6 +232,7 @@ RVectorXd Layer::get_neurons_errors()
 
 void Layer::set_inputs(RVectorXd _inputs)
 {
+    inputs.resize(1, inputs_amount + 1);
     inputs << _inputs, 1; // add an extra input with constant value 1 for the biases
 }
 
@@ -265,14 +281,16 @@ void NeuralNetwork::addLayer(int _inputs_amount, int _neurons_amount, activation
     layers_amount++;
 }
 
-void NeuralNetwork::set_df_train(const std::string &file)
+void NeuralNetwork::set_df_train(const std::string &file, int _label_column_index)
 {
+    label_column_index = _label_column_index;
     df_train = load_csv<MatrixXd>(file);
     inputs_amount = df_train.cols() - 1;
 }
 
-void NeuralNetwork::set_df_test(const std::string &file)
+void NeuralNetwork::set_df_test(const std::string &file, int _label_column_index)
 {
+    label_column_index = _label_column_index;
     df_test = load_csv<MatrixXd>(file);
 }
 
@@ -292,7 +310,7 @@ void NeuralNetwork::predict(RVectorXd inputs, bool print_results)
         layers[i + 1].set_inputs(layers[i].get_outputs());
     }
 
-    outputs = layers[layers_amount].get_outputs();
+    outputs = layers[layers_amount - 1].get_outputs();
 
     if (print_results)
     {
@@ -337,6 +355,7 @@ void NeuralNetwork::train()
 {
     int train_size;
     int outputs_amount = layers.back().get_neurons_amount();
+    layers[layers_amount - 1].mark_as_output_layer();
 
     RVectorXd loss_sums = MatrixXd::Zero(1, outputs_amount);
     RVectorXd loss_derivatives_sums = MatrixXd::Zero(1, outputs_amount);
@@ -379,18 +398,16 @@ void NeuralNetwork::train()
                 loss_sums /= batch_size; // average loss
                 loss_derivatives_sums /= batch_size;
 
-                printBatchInfo(e + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index));
+                printBatchInfo(i + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index));
+                backPropagation(loss_derivatives_sums);
             }
-
-            backPropagation(loss_derivatives_sums);
         }
+        std::cout << "Training finished!" << std::endl;
     }
     catch (...)
     {
         std::cerr << "Error! Prediction resulted in NaN" << '\n';
     }
-
-    std::cout << "Training finished!" << std::endl;
 }
 
 void NeuralNetwork::test() {}
