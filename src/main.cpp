@@ -8,19 +8,24 @@ int main()
 {
 
     std::cout << "Creating Neural Network..." << std::endl;
-    NeuralNetwork nn = NeuralNetwork(CATEGORICAL_CROSS_ENTROPY, numberRecognitionLabelGenerator);
-    nn.setHyperParams(0.01f, 1000, 50);
+    NeuralNetwork nn = NeuralNetwork(CATEGORICAL_CROSS_ENTROPY, oneHotEncoder);
+    nn.setHyperParams(1e-3f, 100, 5);
 
     std::cout << "Adding Layers..." << std::endl;
-    nn.addLayer(784, 128, RELU);
-    nn.addLayer(128, 64, RELU);
-    nn.addLayer(64, 10, SOFTMAX);
+    nn.addLayer(784, 32, RELU);
+    nn.addLayer(32, 10, SOFTMAX);
 
     std::cout << "Setting training dataframe...";
     nn.set_df_train("../datasets/mnist/mnist_train.csv", 0);
     std::cout << " SET!" << std::endl;
 
+    std::cout << "Setting testing dataframe...";
+    nn.set_df_test("../datasets/mnist/mnist_test.csv", 0);
+    std::cout << " SET!" << std::endl;
+
     nn.train();
+
+    nn.test();
 
     return 0;
 }

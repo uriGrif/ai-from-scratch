@@ -29,9 +29,9 @@ RVectorXd categoricalCrossEntropyDerivative(RVectorXd outputs, RVectorXd labels)
 RVectorXd meanSquare(RVectorXd outputs, RVectorXd labels);
 RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels);
 
-// Label Generator Functions
-RVectorXd numberRecognitionLabelGenerator(double correct_label, int size);
-RVectorXd simpleValueLabelGenerator(double correct_label, int size);
+// Label Encoder Functions
+RVectorXd oneHotEncoder(double correct_label, int size);
+RVectorXd simpleValueLabel(double correct_label, int size);
 
 enum activation_type
 {
@@ -77,6 +77,7 @@ public:
     void calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives = nullptr);
     RVectorXd get_neurons_errors();
     void calculate_weight_gradients();
+    void reset_gradients();
     void set_inputs(RVectorXd _inputs);
     void updateWeights(double learning_rate);
     void mark_as_output_layer();
@@ -104,9 +105,9 @@ private:
 
     int layers_amount = 0;
 
-    void backPropagation(RVectorXd loss_derivatives_sums);
+    void backPropagation(RVectorXd loss_derivatives);
     void printOutputs();
-    void printBatchInfo(int epoch, RVectorXd loss_sums, double label, double show_sample_output = false);
+    void printBatchInfo(int epoch, RVectorXd loss_sums, double label, bool show_sample_output = false);
 
 public:
     NeuralNetwork();

@@ -51,7 +51,7 @@ RVectorXd relu(RVectorXd outputs)
     activated.resize(1, outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        activated[i] = outputs[i] < 0 ? 0 : outputs[i];
+        activated[i] = std::max(outputs[i], 0.0);
     }
     return activated;
 }
@@ -62,7 +62,7 @@ MatrixXd reluDerivative(RVectorXd outputs)
     MatrixXd derivatives = MatrixXd::Zero(size, size);
     for (int i = 0; i < size; i++)
     {
-        if (outputs[i] < 0)
+        if (outputs[i] > 0)
             derivatives(i, i) = 1;
     }
     return derivatives;
@@ -73,17 +73,16 @@ RVectorXd softmax(RVectorXd outputs)
     RVectorXd activated(outputs.size());
     double max_value = outputs.maxCoeff();
     outputs = outputs.array() - max_value;
-    activated = (outputs.array()).exp();
+    activated = outputs.array().exp();
     activated /= activated.sum();
-    return activated;
+    return activated.cwiseMax(1e-20);
 }
 
 MatrixXd softmaxDerivative(RVectorXd outputs)
 {
     int size = outputs.size();
+    outputs = softmax(outputs);
     MatrixXd derivatives(size, size);
-    double max_value = outputs.maxCoeff();
-    outputs = outputs.array() - max_value;
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
@@ -104,7 +103,7 @@ RVectorXd categoricalCrossEntropy(RVectorXd outputs, RVectorXd labels)
     RVectorXd loss(outputs.size());
     for (int i = 0; i < outputs.size(); i++)
     {
-        loss[i] = (-labels[i] * log10(std::max(outputs[i], 1e-5)));
+        loss[i] = (-labels[i] * log(std::max(outputs[i], 1e-5)));
     }
     return loss;
 }
@@ -143,16 +142,16 @@ RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels)
 
 // Label Generator Functions -----------------------------------
 
-RVectorXd numberRecognitionLabelGenerator(double correct_label, int size)
+RVectorXd oneHotEncoder(double correct_label, int size)
 {
     RVectorXd labels = MatrixXd::Zero(1, size);
     labels(0, (int)correct_label) = 1;
     return labels;
 }
 
-RVectorXd simpleValueLabelGenerator(double correct_label, int size)
+RVectorXd simpleValueLabel(double correct_label, int size)
 {
-    RVectorXd labels;
+    RVectorXd labels(0, size);
     labels << correct_label;
     return labels;
 }
@@ -187,6 +186,7 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type)
     }
 
     weights = MatrixXd::Random(inputs_amount + 1, neurons_amount);
+    weights /= 2; // set between [-0.5;0.5]
     weights_gradients = MatrixXd::Zero(inputs_amount + 1, neurons_amount);
 }
 
@@ -224,7 +224,7 @@ void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivati
     }
     else
     {
-        neurons_errors = ((*next_layer).get_neurons_errors() * (*next_layer).get_weights_without_bias().transpose()) * activationDerivatives();
+        neurons_errors = (*next_layer).get_neurons_errors() * (*next_layer).get_weights_without_bias().transpose() * activationDerivatives();
     }
     return;
 }
@@ -242,12 +242,17 @@ void Layer::set_inputs(RVectorXd _inputs)
 
 void Layer::calculate_weight_gradients()
 {
-    weights_gradients = inputs.transpose() * neurons_errors;
+    weights_gradients += inputs.transpose() * neurons_errors;
+}
+
+void Layer::reset_gradients()
+{
+    weights_gradients = MatrixXd::Zero(inputs_amount + 1, neurons_amount);
 }
 
 void Layer::updateWeights(double learning_rate)
 {
-    weights += weights_gradients * learning_rate;
+    weights -= weights_gradients * learning_rate;
 }
 
 void Layer::mark_as_output_layer()
@@ -322,10 +327,10 @@ void NeuralNetwork::predict(RVectorXd inputs, bool print_results)
     }
 }
 
-void NeuralNetwork::backPropagation(RVectorXd loss_derivatives_sums)
+void NeuralNetwork::backPropagation(RVectorXd loss_derivatives)
 {
 
-    layers[layers_amount - 1].calculate_neurons_errors(nullptr, &loss_derivatives_sums);
+    layers[layers_amount - 1].calculate_neurons_errors(nullptr, &loss_derivatives);
     for (int i = layers_amount - 2; i >= 0; i--)
     {
         layers[i].calculate_neurons_errors(&layers[i + 1]);
@@ -334,7 +339,6 @@ void NeuralNetwork::backPropagation(RVectorXd loss_derivatives_sums)
     for (int i = 0; i < layers_amount; i++)
     {
         layers[i].calculate_weight_gradients();
-        layers[i].updateWeights(learning_rate);
     }
 }
 
@@ -344,7 +348,7 @@ void NeuralNetwork::printOutputs()
     std::cout << outputs.format(CleanFmt) << std::endl;
 }
 
-void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double label, double show_sample_output)
+void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double label, bool show_sample_output)
 {
     std::cout << "Batch Number: " << batch_number << " --- ";
     std::cout << "Average Loss: " << loss_sums.mean() << std::endl;
@@ -361,8 +365,10 @@ void NeuralNetwork::train()
     int outputs_amount = layers.back().get_neurons_amount();
     layers[layers_amount - 1].mark_as_output_layer();
 
-    RVectorXd loss_sums = MatrixXd::Zero(1, outputs_amount);
-    RVectorXd loss_derivatives_sums = MatrixXd::Zero(1, outputs_amount);
+    RVectorXd loss(outputs_amount);
+    RVectorXd loss_derivatives(outputs_amount);
+    RVectorXd loss_sums;
+    // RVectorXd loss_derivatives_sums;
 
     RVectorXd inputs_aux;
     RVectorXd labels;
@@ -382,11 +388,15 @@ void NeuralNetwork::train()
             for (int i = 0; i < train_size / batch_size; i++)
             {
 
+                loss_sums = MatrixXd::Zero(1, outputs_amount);
+                // loss_derivatives_sums = MatrixXd::Zero(1, outputs_amount);
+
                 for (int j = 0; j < batch_size; j++)
                 {
                     inputs_aux = df_train.row(i * batch_size + j);
                     removeColumn(inputs_aux, label_column_index);
                     // inputs_aux /= inputs_aux.maxCoeff();
+                    inputs_aux /= 255.0;
                     predict(inputs_aux);
 
                     if (outputs.hasNaN())
@@ -396,15 +406,27 @@ void NeuralNetwork::train()
 
                     labels = (*label_gen_func)(df_train(i * batch_size + j, label_column_index), outputs_amount);
 
-                    loss_sums += (*err_func)(outputs, labels);
-                    loss_derivatives_sums += (*err_func_derivative)(outputs, labels);
+                    loss = (*err_func)(outputs, labels);
+                    loss_derivatives = (*err_func_derivative)(outputs, labels);
+
+                    loss_sums += loss;
+                    // loss_derivatives_sums += loss_derivatives;
+
+                    backPropagation(loss_derivatives);
+                }
+
+                for (int i = 0; i < layers_amount; i++)
+                {
+                    layers[i].updateWeights(learning_rate);
+                    layers[i].reset_gradients();
                 }
 
                 loss_sums /= batch_size; // average loss
-                loss_derivatives_sums /= batch_size;
 
-                printBatchInfo(i + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index));
-                backPropagation(loss_derivatives_sums);
+                if ((i + 1) % 10 == 0)
+                {
+                    printBatchInfo(i + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index), (i + 1) % 10 == 0);
+                }
             }
         }
         std::cout << "Training finished!" << std::endl;
@@ -415,4 +437,32 @@ void NeuralNetwork::train()
     }
 }
 
-void NeuralNetwork::test() {}
+void NeuralNetwork::test()
+{
+    std::cout << "Testing model...\n";
+    int test_size = df_test.rows();
+    RVectorXd inputs_aux;
+    double max_prob;
+    int outputs_amount = outputs.size();
+    int prediction;
+    int correct_predictions = 0;
+    for (int i = 0; i < test_size; i++)
+    {
+        inputs_aux = df_test.row(i);
+        removeColumn(inputs_aux, label_column_index);
+        // inputs_aux /= inputs_aux.maxCoeff();
+        inputs_aux /= 255.0;
+        predict(inputs_aux);
+
+        max_prob = outputs.maxCoeff();
+        for (int j = 0; j < outputs_amount; j++)
+        {
+            if (max_prob == outputs[j])
+                prediction = j;
+        }
+
+        if (prediction == df_test(i, label_column_index))
+            correct_predictions++;
+    }
+    std::cout << "Model accuracy: " << (double)correct_predictions / test_size * 100 << "%\n";
+}
