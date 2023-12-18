@@ -102,6 +102,7 @@ private:
     float learning_rate = 0.01f;
     int batch_size = 32;
     int epochs = 50;
+    float inputs_scale_factor = 1; // optional
 
     int layers_amount = 0;
 
@@ -115,7 +116,7 @@ public:
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
     void set_df_train(const std::string &file, int _label_column_index);
     void set_df_test(const std::string &file, int _label_column_index);
-    void setHyperParams(float _learning_rate, int _batch_size, int _epochs);
+    void setHyperParams(float _learning_rate, int _batch_size, int _epochs, float _inputs_scale_factor);
     void predict(RVectorXd inputs, bool print_results = false);
     void train();
     void test();

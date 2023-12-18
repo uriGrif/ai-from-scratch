@@ -8,13 +8,15 @@
 using namespace Eigen;
 
 template <typename M>
-M load_csv(const std::string &path)
+M load_csv(const std::string &path, bool hasHeader = false)
 {
     std::ifstream indata;
     indata.open(path);
     std::string line;
     std::vector<double> values;
     int rows = 0;
+    if (hasHeader)
+        std::getline(indata, line);
     while (std::getline(indata, line))
     {
         std::stringstream lineStream(line);

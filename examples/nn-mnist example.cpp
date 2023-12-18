@@ -1,37 +1,29 @@
 #include <iostream>
 #include <vector>
 #include <string.h>
-#include <variant>
 
-#include "./headers/dataframe.h"
 #include "./headers/neural-network.h"
 
-int main() {
+int main()
+{
 
     std::cout << "Creating Neural Network..." << std::endl;
-    NeuralNetwork nn = NeuralNetwork(3, 784, 10);
+    NeuralNetwork nn = NeuralNetwork(CATEGORICAL_CROSS_ENTROPY, oneHotEncoder);
+    nn.setHyperParams(1e-3f, 100, 4);
 
-    std::cout << "Loading Training Dataframe..." << std::endl;
-    DataFrame df_train = DataFrame("./datasets/mnist/mnist_train.csv", ',', false);
-    nn.setTrainData(df_train);
-    
-    
     std::cout << "Adding Layers..." << std::endl;
-    nn.setLayer(0, 784, 64, 0);
-    nn.setLayer(1, 64, 64, 0);
-    nn.setLayer(2, 64, 10, 1);
+    nn.addLayer(784, 32, RELU);
+    nn.addLayer(32, 10, SOFTMAX);
 
-    std::cout << "Setting hyperparams..." << std::endl;
-    nn.setHyperParams(0.01, 6000, 20);
+    std::cout << "Setting training dataframe...";
+    nn.set_df_train("../datasets/mnist/mnist_train.csv", 0);
+    std::cout << " SET!" << std::endl;
 
-
-    std::cout << "All set!" << std::endl << std::endl;
+    std::cout << "Setting testing dataframe...";
+    nn.set_df_test("../datasets/mnist/mnist_test.csv", 0);
+    std::cout << " SET!" << std::endl;
 
     nn.train();
-
-    std::cout << "Loading Test Dataframe..." << std::endl;
-    DataFrame df_test = DataFrame("./datasets/mnist/mnist_test.csv", ',', false);
-    nn.setTestData(df_test);
 
     nn.test();
 

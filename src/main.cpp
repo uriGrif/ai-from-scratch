@@ -9,7 +9,7 @@ int main()
 
     std::cout << "Creating Neural Network..." << std::endl;
     NeuralNetwork nn = NeuralNetwork(CATEGORICAL_CROSS_ENTROPY, oneHotEncoder);
-    nn.setHyperParams(1e-3f, 100, 5);
+    nn.setHyperParams(1e-2f, 100, 2, (1.f / 255));
 
     std::cout << "Adding Layers..." << std::endl;
     nn.addLayer(784, 32, RELU);

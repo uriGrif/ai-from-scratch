@@ -303,15 +303,20 @@ void NeuralNetwork::set_df_test(const std::string &file, int _label_column_index
     df_test = load_csv<MatrixXd>(file);
 }
 
-void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs)
+void NeuralNetwork::setHyperParams(float _learning_rate, int _batch_size, int _epochs, float _inputs_scale_factor)
 {
     learning_rate = _learning_rate;
     batch_size = _batch_size;
     epochs = _epochs;
+    inputs_scale_factor = _inputs_scale_factor;
 }
 
 void NeuralNetwork::predict(RVectorXd inputs, bool print_results)
 {
+    if (inputs_scale_factor != 1)
+    {
+        inputs *= inputs_scale_factor;
+    }
     layers[0].set_inputs(inputs);
 
     for (int i = 0; i < layers_amount - 1; i++)
@@ -368,7 +373,6 @@ void NeuralNetwork::train()
     RVectorXd loss(outputs_amount);
     RVectorXd loss_derivatives(outputs_amount);
     RVectorXd loss_sums;
-    // RVectorXd loss_derivatives_sums;
 
     RVectorXd inputs_aux;
     RVectorXd labels;
@@ -389,14 +393,11 @@ void NeuralNetwork::train()
             {
 
                 loss_sums = MatrixXd::Zero(1, outputs_amount);
-                // loss_derivatives_sums = MatrixXd::Zero(1, outputs_amount);
 
                 for (int j = 0; j < batch_size; j++)
                 {
                     inputs_aux = df_train.row(i * batch_size + j);
                     removeColumn(inputs_aux, label_column_index);
-                    // inputs_aux /= inputs_aux.maxCoeff();
-                    inputs_aux /= 255.0;
                     predict(inputs_aux);
 
                     if (outputs.hasNaN())
@@ -410,7 +411,6 @@ void NeuralNetwork::train()
                     loss_derivatives = (*err_func_derivative)(outputs, labels);
 
                     loss_sums += loss;
-                    // loss_derivatives_sums += loss_derivatives;
 
                     backPropagation(loss_derivatives);
                 }
@@ -450,8 +450,6 @@ void NeuralNetwork::test()
     {
         inputs_aux = df_test.row(i);
         removeColumn(inputs_aux, label_column_index);
-        // inputs_aux /= inputs_aux.maxCoeff();
-        inputs_aux /= 255.0;
         predict(inputs_aux);
 
         max_prob = outputs.maxCoeff();
