@@ -33,64 +33,64 @@ void removeRow(MatrixXd &matrix, unsigned int rowToRemove)
 
 // Activation functions ----------------------------------------
 
-RVectorXd identity(RVectorXd outputs)
+RVectorXd identity(RVectorXd x)
 {
-    return outputs;
+    return x;
 }
 
-MatrixXd identityDerivative(RVectorXd outputs)
+MatrixXd identityDerivative(RVectorXd x)
 {
-    int size = outputs.size();
+    int size = x.size();
     MatrixXd v = MatrixXd::Identity(size, size);
     return v;
 }
 
-RVectorXd relu(RVectorXd outputs)
+RVectorXd relu(RVectorXd x)
 {
     RVectorXd activated;
-    activated.resize(1, outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    activated.resize(1, x.size());
+    for (int i = 0; i < x.size(); i++)
     {
-        activated[i] = std::max(outputs[i], 0.0);
+        activated[i] = std::max(x[i], 0.0);
     }
     return activated;
 }
 
-MatrixXd reluDerivative(RVectorXd outputs)
+MatrixXd reluDerivative(RVectorXd x)
 {
-    int size = outputs.size();
+    int size = x.size();
     MatrixXd derivatives = MatrixXd::Zero(size, size);
     for (int i = 0; i < size; i++)
     {
-        if (outputs[i] > 0)
+        if (x[i] > 0)
             derivatives(i, i) = 1;
     }
     return derivatives;
 }
 
-RVectorXd softmax(RVectorXd outputs)
+RVectorXd softmax(RVectorXd x)
 {
-    RVectorXd activated(outputs.size());
-    double max_value = outputs.maxCoeff();
-    outputs = outputs.array() - max_value;
-    activated = outputs.array().exp();
+    RVectorXd activated(x.size());
+    double max_value = x.maxCoeff();
+    x = x.array() - max_value;
+    activated = x.array().exp();
     activated /= activated.sum();
     return activated.cwiseMax(1e-20);
 }
 
-MatrixXd softmaxDerivative(RVectorXd outputs)
+MatrixXd softmaxDerivative(RVectorXd x)
 {
-    int size = outputs.size();
-    outputs = softmax(outputs);
+    int size = x.size();
+    x = softmax(x);
     MatrixXd derivatives(size, size);
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
         {
             if (i == j)
-                derivatives(i, j) = outputs[i] * (1 - outputs[i]);
+                derivatives(i, j) = x[i] * (1 - x[i]);
             else
-                derivatives(i, j) = -outputs[i] * outputs[j];
+                derivatives(i, j) = -x[i] * x[j];
         }
     }
     return derivatives;
@@ -98,49 +98,49 @@ MatrixXd softmaxDerivative(RVectorXd outputs)
 
 // Error calculation functions ------------------------------------------
 
-RVectorXd categoricalCrossEntropy(RVectorXd outputs, RVectorXd labels)
+RVectorXd categoricalCrossEntropy(RVectorXd prediction, RVectorXd target)
 {
-    RVectorXd loss(outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    RVectorXd loss(prediction.size());
+    for (int i = 0; i < prediction.size(); i++)
     {
-        loss[i] = (-labels[i] * log(std::max(outputs[i], 1e-5)));
+        loss[i] = (-target[i] * log(std::max(prediction[i], 1e-5)));
     }
     return loss;
 }
 
-RVectorXd categoricalCrossEntropyDerivative(RVectorXd outputs, RVectorXd labels)
+RVectorXd categoricalCrossEntropyDerivative(RVectorXd prediction, RVectorXd target)
 {
-    RVectorXd derivatives(outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    RVectorXd derivatives(prediction.size());
+    for (int i = 0; i < prediction.size(); i++)
     {
-        derivatives[i] = -labels[i] / std::max(outputs[i], 1e-5);
+        derivatives[i] = -target[i] / std::max(prediction[i], 1e-5);
     }
     return derivatives;
 }
 
-RVectorXd meanSquare(RVectorXd outputs, RVectorXd labels)
+RVectorXd meanSquare(RVectorXd prediction, RVectorXd target)
 {
-    RVectorXd loss(outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    RVectorXd loss(prediction.size());
+    for (int i = 0; i < prediction.size(); i++)
     {
-        loss[i] = pow(labels[i] - outputs[i], 2);
+        loss[i] = pow(target[i] - prediction[i], 2);
     }
     return loss;
 }
 
-RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels)
+RVectorXd meanSquareDerivative(RVectorXd prediction, RVectorXd target)
 {
-    RVectorXd derivatives(outputs.size());
-    for (int i = 0; i < outputs.size(); i++)
+    RVectorXd derivatives(prediction.size());
+    for (int i = 0; i < prediction.size(); i++)
     {
-        derivatives[i] = -2 * (labels[i] - outputs[i]);
+        derivatives[i] = -2 * (target[i] - prediction[i]);
     }
     return derivatives;
 }
 
 // -------------------------------------------------------------
 
-// Label Generator Functions -----------------------------------
+// Target Encoder Functions -----------------------------------
 
 RVectorXd oneHotEncoder(double correct_label, int size)
 {
@@ -149,11 +149,35 @@ RVectorXd oneHotEncoder(double correct_label, int size)
     return labels;
 }
 
-RVectorXd simpleValueLabel(double correct_label, int size)
+RVectorXd simpleValueEncoder(double correct_label, int size)
 {
     RVectorXd labels(0, size);
     labels << correct_label;
     return labels;
+}
+
+// -------------------------------------------------------------
+
+// Target Testing Functions ----------------------------------------
+
+bool classificationTesting(RVectorXd prediction, RVectorXd target)
+{
+    double max_value = prediction.maxCoeff();
+    int max_value_index;
+    for (int i = 0; i < prediction.cols(); i++)
+    {
+        if (max_value == prediction(0, i))
+        {
+            max_value_index = i;
+            break;
+        }
+    }
+    return target(0, max_value_index);
+}
+
+bool simpleValueTesting(RVectorXd prediction, RVectorXd target)
+{
+    return prediction == target;
 }
 
 // -------------------------------------------------------------
@@ -218,8 +242,11 @@ MatrixXd Layer::get_weights_without_bias()
 
 void Layer::calculate_neurons_errors(Layer *next_layer, RVectorXd *loss_derivatives)
 {
+    // neuron's errors aka "delta"
+    // dC/dZ
     if (next_layer == nullptr)
     {
+        // last layer
         neurons_errors = (*loss_derivatives) * activationDerivatives();
     }
     else
@@ -255,20 +282,16 @@ void Layer::updateWeights(double learning_rate)
     weights -= weights_gradients * learning_rate;
 }
 
-void Layer::mark_as_output_layer()
-{
-    is_output_layer = true;
-}
-
 // ---------------------------------------------------------------------
 
 // NeuralNetwork definitions -------------------------------------------
 
 NeuralNetwork::NeuralNetwork() {}
 
-NeuralNetwork::NeuralNetwork(error_type err_func_type, Label_Generator_Function _label_gen_func)
+NeuralNetwork::NeuralNetwork(error_type err_func_type, Target_Encoder_Function _label_gen_func, Target_Testing_Function _target_test_func)
 {
     label_gen_func = _label_gen_func;
+    target_test_func = _target_test_func;
     switch (err_func_type)
     {
     case MEAN_SQUARE_ERROR:
@@ -364,11 +387,10 @@ void NeuralNetwork::printBatchInfo(int batch_number, RVectorXd loss_sums, double
     }
 }
 
-void NeuralNetwork::train()
+void NeuralNetwork::train(int batch_info_frequency)
 {
     int train_size;
     int outputs_amount = layers.back().get_neurons_amount();
-    layers[layers_amount - 1].mark_as_output_layer();
 
     RVectorXd loss(outputs_amount);
     RVectorXd loss_derivatives(outputs_amount);
@@ -379,6 +401,11 @@ void NeuralNetwork::train()
 
     std::cout << "Training Samples: " << (train_size = df_train.rows()) << std::endl;
     std::cout << "Training..." << std::endl;
+
+    if (train_size % batch_size)
+    {
+        std::cout << "Warning! Your training dataframe size is not divisible by your selected batch size. This means that " << train_size % batch_size << " samples will by skipped in training.\n";
+    }
 
     try
     {
@@ -423,9 +450,9 @@ void NeuralNetwork::train()
 
                 loss_sums /= batch_size; // average loss
 
-                if ((i + 1) % 10 == 0)
+                if (i % batch_info_frequency == 0)
                 {
-                    printBatchInfo(i + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index), (i + 1) % 10 == 0);
+                    printBatchInfo(i + 1, loss_sums, df_train((i + 1) * batch_size - 1, label_column_index), true);
                 }
             }
         }
@@ -442,9 +469,8 @@ void NeuralNetwork::test()
     std::cout << "Testing model...\n";
     int test_size = df_test.rows();
     RVectorXd inputs_aux;
-    double max_prob;
+    RVectorXd labels;
     int outputs_amount = outputs.size();
-    int prediction;
     int correct_predictions = 0;
     for (int i = 0; i < test_size; i++)
     {
@@ -452,14 +478,9 @@ void NeuralNetwork::test()
         removeColumn(inputs_aux, label_column_index);
         predict(inputs_aux);
 
-        max_prob = outputs.maxCoeff();
-        for (int j = 0; j < outputs_amount; j++)
-        {
-            if (max_prob == outputs[j])
-                prediction = j;
-        }
+        labels = (*label_gen_func)(df_test(i, label_column_index), outputs_amount);
 
-        if (prediction == df_test(i, label_column_index))
+        if ((*target_test_func)(outputs, labels))
             correct_predictions++;
     }
     std::cout << "Model accuracy: " << (double)correct_predictions / test_size * 100 << "%\n";

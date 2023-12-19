@@ -13,25 +13,30 @@ typedef RVectorXd (*Activation_Function)(RVectorXd);
 typedef MatrixXd (*Activation_Derivative_Function)(RVectorXd);
 typedef RVectorXd (*Error_Function)(RVectorXd, RVectorXd);
 typedef RVectorXd (*Error_Derivative_Function)(RVectorXd, RVectorXd);
-typedef RVectorXd (*Label_Generator_Function)(double, int);
+typedef RVectorXd (*Target_Encoder_Function)(double, int);
+typedef bool (*Target_Testing_Function)(RVectorXd, RVectorXd);
 
 // Activation functions
-RVectorXd identity(RVectorXd outputs);
-MatrixXd identityDerivative(RVectorXd outputs); // derivatives return a Jacobian matrix, which can eventually have a 1xN size, technically being a RVectorXd
-RVectorXd relu(RVectorXd outputs);
-MatrixXd reluDerivative(RVectorXd outputs);
-RVectorXd softmax(RVectorXd outputs);
-MatrixXd softmaxDerivative(RVectorXd outputs);
+RVectorXd identity(RVectorXd x);
+MatrixXd identityDerivative(RVectorXd x); // derivatives return a Jacobian matrix, which can eventually have a 1xN size, technically being a RVectorXd
+RVectorXd relu(RVectorXd x);
+MatrixXd reluDerivative(RVectorXd x);
+RVectorXd softmax(RVectorXd x);
+MatrixXd softmaxDerivative(RVectorXd x);
 
 // Error calculation functions
-RVectorXd categoricalCrossEntropy(RVectorXd outputs, RVectorXd labels);
-RVectorXd categoricalCrossEntropyDerivative(RVectorXd outputs, RVectorXd labels);
-RVectorXd meanSquare(RVectorXd outputs, RVectorXd labels);
-RVectorXd meanSquareDerivative(RVectorXd outputs, RVectorXd labels);
+RVectorXd categoricalCrossEntropy(RVectorXd prediction, RVectorXd target);
+RVectorXd categoricalCrossEntropyDerivative(RVectorXd prediction, RVectorXd target);
+RVectorXd meanSquare(RVectorXd prediction, RVectorXd target);
+RVectorXd meanSquareDerivative(RVectorXd prediction, RVectorXd target);
 
-// Label Encoder Functions
+// Target Encoder Functions
 RVectorXd oneHotEncoder(double correct_label, int size);
-RVectorXd simpleValueLabel(double correct_label, int size);
+RVectorXd simpleValueEncoder(double correct_label, int size);
+
+// Target Testing Functions
+bool classificationTesting(RVectorXd prediction, RVectorXd target);
+bool simpleValueTesting(RVectorXd prediction, RVectorXd target);
 
 enum activation_type
 {
@@ -64,8 +69,6 @@ private:
     MatrixXd weights_gradients;
     RVectorXd neurons_errors;
 
-    bool is_output_layer = false;
-
 public:
     Layer();
     Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
@@ -80,7 +83,6 @@ public:
     void reset_gradients();
     void set_inputs(RVectorXd _inputs);
     void updateWeights(double learning_rate);
-    void mark_as_output_layer();
 };
 
 class NeuralNetwork
@@ -97,7 +99,8 @@ private:
 
     Error_Function err_func;
     Error_Derivative_Function err_func_derivative;
-    Label_Generator_Function label_gen_func;
+    Target_Encoder_Function label_gen_func;
+    Target_Testing_Function target_test_func;
 
     float learning_rate = 0.01f;
     int batch_size = 32;
@@ -112,14 +115,15 @@ private:
 
 public:
     NeuralNetwork();
-    NeuralNetwork(error_type err_func_type, Label_Generator_Function _label_gen_func);
+    NeuralNetwork(error_type err_func_type, Target_Encoder_Function _label_gen_func, Target_Testing_Function _target_test_func);
     void addLayer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
     void set_df_train(const std::string &file, int _label_column_index);
     void set_df_test(const std::string &file, int _label_column_index);
     void setHyperParams(float _learning_rate, int _batch_size, int _epochs, float _inputs_scale_factor);
     void predict(RVectorXd inputs, bool print_results = false);
-    void train();
+    void train(int batch_info_frequency = 10);
     void test();
+    void json_export();
 };
 
 #endif
