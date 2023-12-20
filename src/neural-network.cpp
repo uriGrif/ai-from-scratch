@@ -4,6 +4,7 @@
 #include <float.h>
 #include <random>
 #include <iostream>
+#include <fstream>
 
 // UTILS -------------------------------------------------------
 
@@ -190,6 +191,7 @@ Layer::Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type)
 {
     inputs_amount = _inputs_amount;
     neurons_amount = _neurons_amount;
+    act_type = _act_type;
 
     switch (_act_type)
     {
@@ -228,6 +230,8 @@ MatrixXd Layer::activationDerivatives()
 int Layer::get_inputs_amount() { return inputs_amount; }
 
 int Layer::get_neurons_amount() { return neurons_amount; }
+
+activation_type Layer::get_act_type() { return act_type; }
 
 RVectorXd Layer::get_outputs() { return activate(); }
 
@@ -484,4 +488,52 @@ void NeuralNetwork::test()
             correct_predictions++;
     }
     std::cout << "Model accuracy: " << (double)correct_predictions / test_size * 100 << "%\n";
+}
+
+void NeuralNetwork::json_export(const char *path)
+{
+
+    std::cout << "Creating json file export...";
+
+    std::ofstream myFile(path);
+
+    MatrixXd weights;
+
+    myFile << "[";
+    for (int l = 0; l < layers_amount; l++)
+    {
+        myFile << "{\n";
+
+        myFile << "\"inputsAmount\": " << layers[l].get_inputs_amount() << ",\n";
+        myFile << "\"neuronsAmount\": " << layers[l].get_neurons_amount() << ",\n";
+        myFile << "\"activationType\": " << layers[l].get_act_type() << ",\n";
+        myFile << "\"weights\": [\n";
+
+        weights = layers[l].get_weights();
+        for (int i = 0; i < weights.rows(); i++)
+        {
+            myFile << "[";
+            for (int j = 0; j < weights.cols(); j++)
+            {
+                myFile << weights(i, j);
+                if (j < (weights.cols() - 1))
+                    myFile
+                        << ", ";
+            }
+            myFile << "]";
+            if (i < (weights.rows() - 1))
+                myFile
+                    << ", ";
+        }
+
+        myFile << "\n]\n}";
+        if (l < (layers_amount - 1))
+            myFile
+                << ", ";
+    }
+    myFile << "]";
+
+    myFile.close();
+
+    std::cout << "Done!\n";
 }

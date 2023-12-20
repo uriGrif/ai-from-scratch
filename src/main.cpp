@@ -28,5 +28,7 @@ int main()
 
     nn.test();
 
+    nn.json_export("./build/mymodel.json");
+
     return 0;
 }

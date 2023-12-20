@@ -60,6 +60,7 @@ private:
 
     int inputs_amount;
     int neurons_amount;
+    activation_type act_type;
 
     Activation_Function activ;
     Activation_Derivative_Function activ_deriv;
@@ -74,6 +75,7 @@ public:
     Layer(int _inputs_amount, int _neurons_amount, activation_type _act_type);
     int get_inputs_amount();
     int get_neurons_amount();
+    activation_type get_act_type();
     RVectorXd get_outputs();
     MatrixXd get_weights();
     MatrixXd get_weights_without_bias();
@@ -123,7 +125,7 @@ public:
     void predict(RVectorXd inputs, bool print_results = false);
     void train(int batch_info_frequency = 10);
     void test();
-    void json_export();
+    void json_export(const char *path);
 };
 
 #endif
