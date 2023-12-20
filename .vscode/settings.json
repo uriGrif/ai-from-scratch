@@ -49,6 +49,17 @@
 		"iomanip": "cpp",
 		"sstream": "cpp",
 		"variant": "cpp",
-		"cfenv": "cpp"
+		"cfenv": "cpp",
+		"codecvt": "cpp",
+		"map": "cpp",
+		"complex": "cpp",
+		"list": "cpp",
+		"set": "cpp",
+		"cstring": "cpp",
+		"ratio": "cpp",
+		"semaphore": "cpp",
+		"stop_token": "cpp",
+		"thread": "cpp",
+		"optional": "cpp"
 	}
 }

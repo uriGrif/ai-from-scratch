@@ -1,5 +1,7 @@
 *.exe
 
-main.cpp
-
 /datasets/mnist/
+
+/Eigen
+
+/build
