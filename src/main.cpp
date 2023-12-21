@@ -13,8 +13,9 @@ int main()
     // for this dataset, each pixel has a value from 0 to 255. With this values, the gradients end up being too high and we have overflow problems. A solution to this, is to divide by 255, so now every pixel goes from 0 to 1
 
     std::cout << "Adding Layers..." << std::endl;
-    nn.addLayer(784, 32, RELU);
-    nn.addLayer(32, 10, SOFTMAX);
+    nn.addLayer(784, 10, RELU);
+    nn.addLayer(10, 10, RELU);
+    nn.addLayer(10, 10, SOFTMAX);
 
     std::cout << "Setting training dataframe...";
     nn.set_df_train("../datasets/mnist/mnist_train.csv", 0);

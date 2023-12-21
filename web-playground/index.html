@@ -3,6 +3,43 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Digit Recognition Playground</title>
+		<link rel="stylesheet" href="styles.css" />
 	</head>
-	<body></body>
+	<body>
+		<h1>Handwritten Digit Recognition Playground</h1>
+		<div class="grid"></div>
+		<button class="btn" onclick="restart()">clear</button>
+		<button class="btn" onclick="predict()">predict</button>
+		<h2 id="prediction">Prediction:</h2>
+		<h3>Probabilities</h3>
+		<table>
+			<thead>
+				<th>0</th>
+				<th>1</th>
+				<th>2</th>
+				<th>3</th>
+				<th>4</th>
+				<th>5</th>
+				<th>6</th>
+				<th>7</th>
+				<th>8</th>
+				<th>9</th>
+			</thead>
+			<tbody>
+				<tr>
+					<td id="prob-0">0</td>
+					<td id="prob-1">1</td>
+					<td id="prob-2">2</td>
+					<td id="prob-3">3</td>
+					<td id="prob-4">4</td>
+					<td id="prob-5">5</td>
+					<td id="prob-6">6</td>
+					<td id="prob-7">7</td>
+					<td id="prob-8">8</td>
+					<td id="prob-9">9</td>
+				</tr>
+			</tbody>
+		</table>
+		<script src="./index.js"></script>
+	</body>
 </html>
